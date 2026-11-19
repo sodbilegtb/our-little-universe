@@ -18,7 +18,9 @@ test-results/
 playwright-report/
 # Local API data
 .local-data/
-# Terraform working files
+# Terraform working files (saved plans can contain sensitive values)
+*.tfplan
+_to_delete/
 **/.terraform-build/
 **/backend.hcl
 apps/web/web-deploy.zip
