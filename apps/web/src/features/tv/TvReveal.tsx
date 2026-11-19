@@ -5,9 +5,8 @@ import { ease, riseIn } from '@/lib/motion';
 import { TvScene } from './TvChrome';
 
 /**
- * The waiting moment before the reveal. Motes circle slowly toward the centre.
- * The cinematic sequence and the result itself arrive in Milestone 7, and the
- * TV receives the result only after the server authorises the reveal.
+ * The waiting moment before the host enters the code. Motes circle slowly
+ * toward the centre. Once the code is accepted, TvRevealSequence takes over.
  */
 export function TvRevealWaiting() {
   const reduce = useReducedMotion();

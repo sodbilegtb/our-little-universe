@@ -2,18 +2,21 @@ import { useMemo } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { mulberry32 } from '@/lib/random';
 
-/** Neutral palette only. Pink and blue are reserved for after the reveal. */
-const COLORS = ['#D8BD8B', '#E9D8B6', '#FAF7F0', '#A9B7A0', '#B9B1C8'];
+/** Neutral by default. Pink and blue are passed in only after the reveal. */
+const NEUTRAL = ['#D8BD8B', '#E9D8B6', '#FAF7F0', '#A9B7A0', '#B9B1C8'];
 
 interface ConfettiProps {
   count?: number;
   /** Height of the fall in px. */
   fall?: number;
   seed?: number;
+  colors?: readonly string[];
+  /** Seconds over which the pieces start falling. */
+  spread?: number;
 }
 
-/** Subtle falling paper flakes for the quiz winner. Plays once. */
-export function Confetti({ count = 70, fall = 1100, seed = 3 }: ConfettiProps) {
+/** Subtle falling paper flakes (the quiz winner, the reveal). Plays once. */
+export function Confetti({ count = 70, fall = 1100, seed = 3, colors = NEUTRAL, spread = 1.8 }: ConfettiProps) {
   const reduce = useReducedMotion();
   const pieces = useMemo(() => {
     const rand = mulberry32(seed);
@@ -22,13 +25,13 @@ export function Confetti({ count = 70, fall = 1100, seed = 3 }: ConfettiProps) {
       left: rand() * 100,
       width: 6 + rand() * 6,
       height: 10 + rand() * 8,
-      color: COLORS[Math.floor(rand() * COLORS.length)] ?? '#D8BD8B',
-      delay: rand() * 1.8,
+      color: colors[Math.floor(rand() * colors.length)] ?? '#D8BD8B',
+      delay: rand() * spread,
       duration: 4 + rand() * 3,
       sway: (rand() - 0.5) * 160,
       spin: (rand() - 0.5) * 720,
     }));
-  }, [count, seed]);
+  }, [count, seed, colors, spread]);
 
   if (reduce) return null;
 

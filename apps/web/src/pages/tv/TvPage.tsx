@@ -8,6 +8,7 @@ import { TvVoting } from '@/features/tv/TvVoting';
 import { TvQuiz } from '@/features/tv/TvQuiz';
 import { TvMessages } from '@/features/tv/TvMessages';
 import { TvRevealWaiting } from '@/features/tv/TvReveal';
+import { TvRevealSequence } from '@/features/tv/TvRevealSequence';
 import { TvFinished } from '@/features/tv/TvFinished';
 import { useLiveView } from '@/hooks/useLiveView';
 import { ConnectionNotice } from '@/components/ui/ConnectionNotice';
@@ -31,11 +32,14 @@ function sceneFor(view: TvView): { key: string; cue: TvCue } {
     case 'MESSAGES':
       return { key: 'messages', cue: 'messages' };
     case 'REVEAL':
-      return { key: 'reveal', cue: 'reveal-waiting' };
+      // The sequence announces its own stages once the code is accepted.
+      return revealRunning(view) ? { key: 'reveal-sequence', cue: 'reveal-build' } : { key: 'reveal', cue: 'reveal-waiting' };
     case 'FINISHED':
       return { key: 'finished', cue: 'finished' };
   }
 }
+
+const revealRunning = (view: TvView) => view.reveal.status === 'REVEALING' || view.reveal.status === 'REVEALED';
 
 /** Fullscreen presentation client. No controls, no debug output. */
 export function TvPage() {
@@ -70,7 +74,7 @@ function TvSceneSwitch({ view }: { view: TvView }) {
     case 'MESSAGES':
       return <TvMessages view={view} />;
     case 'REVEAL':
-      return <TvRevealWaiting />;
+      return revealRunning(view) ? <TvRevealSequence reveal={view.reveal} /> : <TvRevealWaiting />;
     case 'FINISHED':
       return <TvFinished view={view} />;
   }
