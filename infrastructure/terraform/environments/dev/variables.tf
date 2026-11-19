@@ -62,6 +62,12 @@ variable "email_sender_domain" {
   default     = ""
 }
 
+variable "email_transport" {
+  description = "How the code email is sent: \"ses\" (Amazon SES) or \"gmail\" (email_sender is a Gmail account; store its app password with `npm run aws:set-gmail-password -- dev`)."
+  type        = string
+  default     = "ses"
+}
+
 variable "email_dns_in_route53" {
   description = "The sender domain's DNS is a Route 53 hosted zone in this account: Terraform writes the DKIM records itself."
   type        = bool

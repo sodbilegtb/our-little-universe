@@ -65,12 +65,22 @@ resource "aws_iam_role_policy" "mailer" {
           Resource = "${aws_cloudwatch_log_group.mailer.arn}:*"
         },
       ],
-      length(var.ses_identity_arns) == 0 ? [] : [
+      var.email_transport != "ses" || length(var.ses_identity_arns) == 0 ? [] : [
         {
           Sid      = "SendAsVerifiedIdentities"
           Effect   = "Allow"
           Action   = "ses:SendEmail"
           Resource = var.ses_identity_arns
+        },
+      ],
+      var.email_transport != "gmail" ? [] : [
+        {
+          # SecureString with the AWS-managed key (alias/aws/ssm): the key policy
+          # already allows decryption through SSM for this account.
+          Sid      = "ReadGmailAppPassword"
+          Effect   = "Allow"
+          Action   = "ssm:GetParameter"
+          Resource = "arn:aws:ssm:${data.aws_region.current.region}:${local.account_id}:parameter${var.gmail_app_password_parameter_name}"
         },
       ],
     )

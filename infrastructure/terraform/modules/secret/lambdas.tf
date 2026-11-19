@@ -55,12 +55,22 @@ resource "aws_lambda_function" "mailer" {
       PUBLIC_APP_URL       = var.public_app_url
       EMAIL_SENDER         = var.email_sender
       EMAIL_RECIPIENTS     = join(",", var.email_recipients)
-    })
+      EMAIL_TRANSPORT      = var.email_transport
+      }, var.email_transport == "gmail" ? {
+      GMAIL_APP_PASSWORD_PARAMETER = var.gmail_app_password_parameter_name
+    } : {})
   }
 
   logging_config {
     log_format = "Text"
     log_group  = aws_cloudwatch_log_group.mailer.name
+  }
+
+  lifecycle {
+    precondition {
+      condition     = var.email_transport != "gmail" || can(regex("^/[A-Za-z0-9_./-]+$", var.gmail_app_password_parameter_name))
+      error_message = "Sending through Gmail needs gmail_app_password_parameter_name (an SSM parameter name like /olu/dev/gmail-app-password)."
+    }
   }
 
   depends_on = [aws_iam_role_policy.mailer, aws_cloudwatch_log_group.mailer]

@@ -151,3 +151,72 @@ run "no_email_configured" {
     error_message = "Without identities the mailer can't send anything."
   }
 }
+
+run "ses_by_default" {
+  command = apply
+
+  assert {
+    condition     = one(aws_lambda_function.mailer.environment).variables["EMAIL_TRANSPORT"] == "ses"
+    error_message = "The mailer sends through SES unless Gmail is chosen."
+  }
+
+  assert {
+    condition     = length([for s in jsondecode(aws_iam_role_policy.mailer.policy).Statement : s if s.Action == "ssm:GetParameter"]) == 0
+    error_message = "With SES the mailer reads no parameter."
+  }
+}
+
+run "sending_through_gmail" {
+  command = apply
+
+  variables {
+    email_sender                      = "sender@gmail.com"
+    email_transport                   = "gmail"
+    gmail_app_password_parameter_name = "/olu/dev/gmail-app-password"
+  }
+
+  assert {
+    condition = (
+      one(aws_lambda_function.mailer.environment).variables["EMAIL_TRANSPORT"] == "gmail" &&
+      one(aws_lambda_function.mailer.environment).variables["GMAIL_APP_PASSWORD_PARAMETER"] == "/olu/dev/gmail-app-password"
+    )
+    error_message = "The mailer knows the transport and where its app password is."
+  }
+
+  assert {
+    condition = [
+      for s in jsondecode(aws_iam_role_policy.mailer.policy).Statement : s.Resource if s.Action == "ssm:GetParameter"
+    ] == ["arn:aws:ssm:eu-central-1:123456789012:parameter/olu/dev/gmail-app-password"]
+    error_message = "The mailer may read exactly that one parameter."
+  }
+
+  assert {
+    condition     = length([for s in jsondecode(aws_iam_role_policy.mailer.policy).Statement : s if s.Action == "ses:SendEmail"]) == 0
+    error_message = "With Gmail the mailer no longer needs SES."
+  }
+
+  assert {
+    condition     = !contains(keys(one(aws_lambda_function.reveal.environment).variables), "GMAIL_APP_PASSWORD_PARAMETER")
+    error_message = "Only the mailer learns where the app password is."
+  }
+}
+
+run "gmail_needs_its_parameter" {
+  command = plan
+
+  variables {
+    email_transport = "gmail"
+  }
+
+  expect_failures = [aws_lambda_function.mailer]
+}
+
+run "rejects_unknown_transport" {
+  command = plan
+
+  variables {
+    email_transport = "pigeon"
+  }
+
+  expect_failures = [var.email_transport]
+}

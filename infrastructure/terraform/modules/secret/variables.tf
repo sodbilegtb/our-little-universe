@@ -62,6 +62,23 @@ variable "email_recipients" {
   default = []
 }
 
+variable "email_transport" {
+  description = "How the code email is sent: \"ses\" (Amazon SES) or \"gmail\" (a Gmail account with an app password)."
+  type        = string
+  default     = "ses"
+
+  validation {
+    condition     = contains(["ses", "gmail"], var.email_transport)
+    error_message = "email_transport must be \"ses\" or \"gmail\"."
+  }
+}
+
+variable "gmail_app_password_parameter_name" {
+  description = "With gmail: the SSM SecureString holding the sender account's app password (only the mailer may read it)."
+  type        = string
+  default     = ""
+}
+
 variable "ses_identity_arns" {
   description = "Verified SES identities (sender and, in the sandbox, recipients)."
   type        = list(string)

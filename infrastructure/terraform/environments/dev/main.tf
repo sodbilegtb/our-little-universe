@@ -30,7 +30,8 @@ module "hosting" {
 module "email" {
   source = "../../modules/email"
 
-  sender_address      = var.email_sender
+  # A Gmail sender signs in to Gmail; SES only needs to know it when SES sends.
+  sender_address      = var.email_transport == "ses" ? var.email_sender : ""
   sender_domain       = var.email_sender_domain
   manage_dns_records  = var.email_dns_in_route53
   recipient_addresses = var.email_recipients
@@ -39,22 +40,25 @@ module "email" {
 module "secret" {
   source = "../../modules/secret"
 
-  name                   = local.name
-  environment            = local.environment
-  event_id               = var.event_id
-  event_name             = var.event_name
-  reveal_mode            = "TEST" # dev can never run a live reveal
-  events_table_name      = module.database.table_name
-  events_table_arn       = module.database.table_arn
-  mailer_source_dir      = "${local.lambda_dist}/mailer"
-  reveal_source_dir      = "${local.lambda_dist}/reveal"
-  public_app_url         = module.hosting.url
-  email_sender           = var.email_sender
-  email_recipients       = var.email_recipients
-  ses_identity_arns      = module.email.identity_arns
-  point_in_time_recovery = true
-  deletion_protection    = false
-  log_retention_days     = 14
+  name              = local.name
+  environment       = local.environment
+  event_id          = var.event_id
+  event_name        = var.event_name
+  reveal_mode       = "TEST" # dev can never run a live reveal
+  events_table_name = module.database.table_name
+  events_table_arn  = module.database.table_arn
+  mailer_source_dir = "${local.lambda_dist}/mailer"
+  reveal_source_dir = "${local.lambda_dist}/reveal"
+  public_app_url    = module.hosting.url
+  email_sender      = var.email_sender
+  email_recipients  = var.email_recipients
+  email_transport   = var.email_transport
+  ses_identity_arns = module.email.identity_arns
+  # Written by `npm run aws:set-gmail-password -- dev`, never by Terraform (it would land in the state).
+  gmail_app_password_parameter_name = var.email_transport == "gmail" ? "/olu/${local.environment}/gmail-app-password" : ""
+  point_in_time_recovery            = true
+  deletion_protection               = false
+  log_retention_days                = 14
 }
 
 module "api" {

@@ -7,8 +7,16 @@ alarm_email  = "you@example.com"
 # Uncomment to call the dev API from `npm run dev` on your laptop:
 # extra_allowed_origins = ["http://localhost:5173"]
 
-# Reveal code email (Amazon SES). In the SES sandbox every address below gets a
-# verification email from AWS first; click the link in each.
+# Reveal code email. Two ways to send it:
+#
+# a) Gmail (simplest): a Gmail account with an app password sends the code.
+#    Then store the app password: npm run aws:set-gmail-password -- dev
+# email_transport  = "gmail"
+# email_sender     = "sender@gmail.com"
+# email_recipients = ["you@gmail.com"]
+#
+# b) Amazon SES (the default). In the SES sandbox every address below gets a
+#    verification email from AWS first; click the link in each.
 # email_sender        = "reveal@example.com"
 # email_sender_domain = "example.com"   # optional: verify the whole domain (better delivery)
 # email_dns_in_route53 = true           # the domain's DNS is in Route 53 here: Terraform adds the DKIM records
