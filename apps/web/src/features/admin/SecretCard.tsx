@@ -107,7 +107,10 @@ export function SecretCard({ view, onChanged }: { view: AdminView; onChanged: ()
         {sealed && (
           <div className="flex items-center justify-between gap-3">
             <dt className="text-mist">Code email</dt>
-            <dd className={doctor.email.status === 'FAILED' ? 'text-champagne' : 'text-ivory-dim'}>{EMAIL_TEXT[doctor.email.status]}</dd>
+            <dd className={doctor.email.status === 'FAILED' ? 'text-champagne' : 'text-ivory-dim'}>
+              {/* Once the reveal has started the code is spent, so there is nothing left to resend. */}
+              {doctor.email.status === 'FAILED' && revealStarted ? 'Failed' : EMAIL_TEXT[doctor.email.status]}
+            </dd>
           </div>
         )}
         <div className="flex items-center justify-between gap-3">
