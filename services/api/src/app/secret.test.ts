@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import type { Ids } from '@olu/event-core';
 import type { AdminCommand, DoctorChoice, GuestSession } from '@olu/shared';
 import type { AppConfig } from '../config/config';
@@ -374,6 +374,46 @@ describe.each(backends)('the secret on $name', ({ create }) => {
     // the same ciphertext can't be opened as a code, or for another event
     await expect(w.vault.open('reveal-code', sealed!.choiceCiphertext, context)).rejects.toThrow();
     await expect(w.vault.open('doctor-selection', sealed!.choiceCiphertext, { ...context, eventId: 'other' })).rejects.toThrow();
+  });
+
+  it('starts a new rehearsal in test mode: a clean evening, the old run kept, its code dead', async () => {
+    const w = world(create());
+    await seal(w, 'BOY');
+    const oldCode = codeFromMail(w);
+    const oldGuests = await toRevealPhase(w);
+    expect((await w.service.submitRevealCode(oldCode)).accepted).toBe(true);
+    w.clock.tick(30_000);
+
+    const commit = vi.spyOn(w.repository, 'commit');
+    await w.service.startNewRehearsal();
+    // nothing is erased: the switch writes the control state and nothing else
+    const [, , changes] = commit.mock.calls.at(-1)!;
+    expect(changes).toMatchObject({ run: 1, guestsAdded: [], answersDeleted: [], messagesAdded: [], messagesUpdated: [] });
+    expect(changes.control).not.toBeNull();
+
+    const tv = await w.service.tvView();
+    expect(tv).toMatchObject({ phase: 'LOBBY', guestCount: 0, voting: { tally: { total: 0 } }, reveal: { status: 'LOCKED' } });
+    expect(tv.messages.stars).toHaveLength(0);
+    expect((await w.service.adminView()).doctor.status).toBe('NOT_STARTED');
+    expect(await w.reveal()).toBeNull();
+    // guests of the earlier run are strangers now and join again
+    const old = { guestId: oldGuests[0]!.guestId, sessionToken: oldGuests[0]!.sessionToken };
+    expect((await w.service.guestView(old)).me).toBeNull();
+
+    // the new run plays through on its own; the old code unlocks nothing
+    await seal(w, 'GIRL', 'b1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d');
+    const newCode = codeFromMail(w);
+    await toRevealPhase(w);
+    expect((await w.service.submitRevealCode(oldCode)).accepted).toBe(false);
+    expect((await w.service.submitRevealCode(newCode)).accepted).toBe(true);
+    const exported = await w.service.exportEvent();
+    expect(exported.guests.map((g) => g.displayName)).toEqual(['Mia', 'Ben']);
+    expect(exported.messages).toHaveLength(1);
+  });
+
+  it('offers no new rehearsal in live mode', async () => {
+    const live = world(create(), { eventId: 'rehearsal-1', patch: { environment: 'prod', revealMode: 'LIVE' } });
+    expect(await errorCode(live.service.startNewRehearsal())).toBe('NOT_FOUND');
   });
 });
 

@@ -9,6 +9,7 @@ import {
   registerGuestSchema,
   revealCodeRequestSchema,
   secretResetSchema,
+  newRehearsalSchema,
 } from '@olu/shared';
 import type { z } from 'zod';
 import { AppError, unauthorized } from '../app/errors';
@@ -94,6 +95,12 @@ const routes: Record<string, Handler> = {
   'POST /v1/admin/doctor/simulate': async ({ service, admin }) => {
     await admin();
     return json(201, await service.simulateDoctor());
+  },
+  'POST /v1/admin/rehearsal/new': async ({ service, admin, body }) => {
+    await admin();
+    body(newRehearsalSchema);
+    await service.startNewRehearsal();
+    return noContent();
   },
 
   // The doctor. The token travels in the body: URLs end up in access logs.

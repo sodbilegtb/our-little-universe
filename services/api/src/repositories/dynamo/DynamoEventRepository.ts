@@ -27,6 +27,9 @@ import { ConcurrencyError, type EventRepository, type EventSnapshot, type Revisi
  *   ADMIN_SESSION#<tokenHash>  SESSION                          expiresAt, ttl
  *   RATE#<key>#<window>        RATE                             count, ttl
  *
+ * Guest, vote, answer and message items also carry `run`, the rehearsal run
+ * they belong to; only items of the run named in STATE are loaded.
+ *
  * Uniqueness (one vote per guest, one answer per question, idempotent
  * messages) comes from the keys plus attribute_not_exists conditions.
  * Host commands update STATE only if its version is unchanged.
@@ -104,7 +107,10 @@ export class DynamoEventRepository implements EventRepository {
     const votes: Record<string, VoteRecord> = {};
     const answers: Record<string, Record<string, AnswerRecord>> = {};
     const messages: MessageRecord[] = [];
+    // Items of earlier rehearsal runs stay stored but are no longer part of the event.
+    const run = (stateItem.data as Partial<ControlState>).run ?? 0;
     for (const item of items) {
+      if (((item.run as number | undefined) ?? 0) !== run) continue;
       if (item.sk.startsWith('GUEST#')) {
         guests.push({
           id: item.guestId as string,
@@ -165,7 +171,7 @@ export class DynamoEventRepository implements EventRepository {
     const pk = eventPk(eventId);
     const TableName = this.tableName;
     const ops: NonNullable<TransactWriteCommandInput['TransactItems']> = [];
-    const put = (Item: Item) => ops.push({ Put: { TableName, Item, ...NOT_EXISTS } });
+    const put = (Item: Item) => ops.push({ Put: { TableName, Item: { ...Item, run: changes.run }, ...NOT_EXISTS } });
 
     if (changes.control) {
       ops.push({

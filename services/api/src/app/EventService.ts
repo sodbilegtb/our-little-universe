@@ -24,6 +24,7 @@ import {
   type GuestRecord,
   type Ids,
   type SimulationContext,
+  startNewRun,
 } from '@olu/event-core';
 import type {
   AdminCommand,
@@ -513,6 +514,19 @@ export class EventService {
     if (!code) throw new AppError('NOT_AVAILABLE', 'Please try again.', 503);
     this.logger.info('doctor simulated (test mode)');
     return { code };
+  }
+
+  /**
+   * TEST mode only: starts the evening over as a new rehearsal run, so the
+   * whole flow (reveal included) can be tried again without a new event id.
+   * Nothing is erased: the earlier run stays stored and stops being shown.
+   * Guests of the earlier run are asked for their name again. LIVE: 404.
+   */
+  async startNewRehearsal(): Promise<void> {
+    if (this.mode !== 'TEST') throw new AppError('NOT_FOUND', 'Not found.', 404);
+    const { retiredSelectionId } = await this.mutate((draft) => startNewRun(draft));
+    if (retiredSelectionId) await this.secrets.store.retireSelection(this.eventId, retiredSelectionId);
+    this.logger.info('new rehearsal run started (test mode)');
   }
 
   /**

@@ -71,6 +71,8 @@ export interface AnswerKey {
 }
 
 export interface ChangeSet {
+  /** The rehearsal run the change belongs to; stored with every new item. */
+  run: number;
   /** The new control state, or null if unchanged. */
   control: ControlState | null;
   guestsAdded: GuestRecord[];
@@ -97,7 +99,19 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
  */
 export function diff(before: EventState, after: EventState): ChangeSet {
   const control = controlOf(after);
+  if (after.run !== before.run) {
+    // A new rehearsal run: only the control state is written. Items of the
+    // earlier run stay stored under their run and simply stop being loaded.
+    const empty =
+      after.guests.length === 0 &&
+      Object.keys(after.voting.votes).length === 0 &&
+      Object.keys(after.quiz.answers).length === 0 &&
+      after.messages.items.length === 0;
+    if (after.run !== before.run + 1 || !empty) throw new UnsupportedChangeError('a new run must start empty');
+    return { run: after.run, control, guestsAdded: [], votesAdded: [], answersAdded: [], answersDeleted: [], messagesAdded: [], messagesUpdated: [] };
+  }
   const changes: ChangeSet = {
+    run: after.run,
     control: same(controlOf(before), control) ? null : control,
     guestsAdded: [],
     votesAdded: [],

@@ -13,6 +13,8 @@ interface StoredEvent {
   /** Keyed "<questionId>#<guestId>", like the DynamoDB sort key. */
   answers: Record<string, AnswerRecord>;
   messages: Record<string, MessageRecord>;
+  /** What earlier rehearsal runs stored, kept as it was (DynamoDB keeps it too). */
+  earlierRuns?: { run: number; guests: Record<string, GuestRecord>; votes: Record<string, VoteRecord>; answers: Record<string, AnswerRecord>; messages: Record<string, MessageRecord> }[];
 }
 
 interface StoredData {
@@ -99,6 +101,11 @@ export class MemoryEventRepository implements EventRepository {
     for (const m of changes.messagesUpdated) if (!event.messages[m.id]) throw new ConcurrencyError('message missing');
 
     if (changes.control) {
+      const previousRun = event.control.run ?? 0;
+      if (changes.control.run !== previousRun) {
+        (event.earlierRuns ??= []).push({ run: previousRun, guests: event.guests, votes: event.votes, answers: event.answers, messages: event.messages });
+        Object.assign(event, { guests: {}, votes: {}, answers: {}, messages: {} });
+      }
       event.control = structuredClone(changes.control);
       event.stateVersion += 1;
     }
