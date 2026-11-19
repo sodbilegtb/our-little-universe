@@ -123,6 +123,9 @@ docs/                      Architecture, API, data model, deployment, design sys
 - `npm run aws:preflight -- prod`: one read-only go/no-go check before the evening.
 - The runbook for the evening, the doctor and the switch to LIVE: [`docs/production.md`](docs/production.md). The security review: [`docs/security-review.md`](docs/security-review.md).
 
+**For after the party (Milestone 9)**
+- `npm run aws:export -- prod` (everything, checked, with a printable memory book), `aws:backup`, and `aws:teardown-check` before removing anything: [`docs/after-the-party.md`](docs/after-the-party.md).
+
 **Built and tested, not yet deployed to AWS**
 - The cinematic TV reveal (Milestone 7): about 30 seconds on the server clock, the result requested only at the reveal moment, the celebration, and recovery after a TV refresh. See [`docs/milestones.md`](docs/milestones.md).
 - "Start a new rehearsal" (test mode only): back to the lobby without a new event id, nothing erased.

@@ -256,3 +256,19 @@ About 30 seconds on the TV, laid out around the server's `revealAt` (R), see `ap
 
 ### Not yet done (yours to decide and run)
 - `terraform apply` for prod, the dress rehearsal on real devices, the switch to LIVE, and the doctor's visit.
+
+## Milestone 9: Export and cleanup (ready; you run it after the party)
+
+### Keeping the memories
+- `npm run aws:export -- <env>` saves the evening to `exports/` (ignored by Git): `event.json` with everything and the result, CSV files, a printable `memory-book.html` (every message except removed ones, the result, the guesses, the quiz winner) and `manifest.json` with a SHA-256 checksum and row count per file. It checks the copy right away; `--verify <folder>` checks any copy later.
+- `npm run aws:backup -- <env>`: an on-demand DynamoDB backup, which stays after the table is deleted.
+- CSV files (here and on the host desk) defuse spreadsheet formulas in guest names and messages.
+
+### Removing it safely
+- `npm run aws:teardown-check -- <env>`, read-only: for prod it requires a verified export of the current event made after the evening, and a backup newer than that; for dev it requires prod to be gone (prod sends with dev's email identities). It prints the commands; it never runs them.
+- Prod's deletion protection comes off only with `allow_destroy = true`, a separate plan and apply.
+- [`after-the-party.md`](after-the-party.md): the order, the commands, and what stays afterwards (backups, SSM parameters, KMS keys waiting out their deletion window, the state bucket).
+
+### Verified
+- `node --test` for the archive: CSV round trip with quotes, line breaks, emoji and formula guards; a whole archive verifies, a changed or missing file is reported; the memory book escapes HTML and leaves out removed messages; the result appears only once revealed.
+- The export end to end against the local API after a rehearsal; backup and teardown check against stand-ins for the AWS CLI and Terraform (ready, missing export, missing backup, dev while prod exists); prod `terraform test` for `allow_destroy`.

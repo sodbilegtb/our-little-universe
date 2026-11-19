@@ -108,8 +108,7 @@ If the email doesn't arrive: "Send the code again" on the host desk (always the 
 
 ## 7. After the party
 
-1. Right away: "Keep the evening" on the host desk, download every file and open each one. `aws:preflight` keeps working afterwards.
-2. Milestone 9 covers the verified export and the teardown. Destroy prod before dev: dev owns the SES identities prod uses. The production tables refuse deletion until you turn that off on purpose.
+The same evening: `ADMIN_PASSWORD=… npm run aws:export -- prod` saves and checks everything (with a printable memory book), then `npm run aws:backup -- prod`. Removing prod and dev later, safely and in that order: [`after-the-party.md`](after-the-party.md).
 
 ## 8. Costs
 

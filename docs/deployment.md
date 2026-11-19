@@ -222,7 +222,7 @@ Prices: [API Gateway](https://aws.amazon.com/api-gateway/pricing/), [Lambda](htt
 
 ## 11. Tear down dev
 
-Dev holds only rehearsal data, but export anything you want to keep first (host desk → Keep the evening). **Production reuses dev's SES identities: tear down prod first** (`docs/production.md`).
+Dev holds only rehearsal data, but export anything you want to keep first (`npm run aws:export -- dev`). **Production reuses dev's SES identities: tear down prod first.** `npm run aws:teardown-check -- dev` checks that, and [`after-the-party.md`](after-the-party.md) walks through both environments and what stays afterwards.
 
 ```bash
 cd infrastructure/terraform/environments/dev
