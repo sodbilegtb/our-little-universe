@@ -3,6 +3,11 @@ import {
   EXAMPLE_QUESTIONS,
   applyAdminCommand,
   authenticateGuest,
+  authorizeReveal,
+  isCurrentDoctorLink,
+  issueDoctorLink,
+  recordDoctorSelection,
+  resetSecret,
   castVote,
   createEventState,
   registerGuest,
@@ -25,18 +30,30 @@ import type {
   AdminView,
   BabyMessageInput,
   CastVoteInput,
+  DoctorChoice,
+  DoctorLinkResult,
+  DoctorSessionResult,
   EventExport,
   GuestSession,
   GuestView,
   QuizAnswerInput,
   RegisterGuestInput,
+  RevealCodeResult,
+  RevealMode,
+  SimulatedDoctorResult,
   TvView,
 } from '@olu/shared';
+import { randomInt, randomUUID } from 'node:crypto';
 import type { AppConfig } from '../config/config';
 import { diff, isEmpty } from '../domain/changeset';
 import { combinedRevision, ConcurrencyError, type EventRepository, type EventSnapshot } from '../repositories/EventRepository';
 import { verifyPassword } from '../security/password';
 import { randomToken, sha256 } from '../security/tokens';
+import { InlineMailerTrigger, type MailerTrigger } from '../mail/trigger';
+import { OutboxTransport } from '../mail/transport';
+import { doctorTokenHash, generateRevealCode, normalizeRevealCode, revealCodeHash, selectionIdFor } from '../secret/codes';
+import { MemorySecretStore, type ApiSecretStore, type DoctorLinkRecord } from '../secret/SecretStore';
+import { LocalVault, type Sealer } from '../secret/vault';
 import { AppError, unauthorized } from './errors';
 import { silentLogger, type Logger } from './logger';
 
@@ -53,9 +70,52 @@ export interface ServiceDeps {
   logger?: Logger;
   /** Where the host password hash comes from (SSM when deployed). Defaults to config. */
   passwordHash?: () => Promise<string | undefined>;
+  /** The secret workflow's dependencies. Only the local server may fall back to in-memory ones. */
+  secrets?: SecretDeps;
+  /** Tests: deterministic code generation. */
+  randomPick?: (max: number) => number;
+}
+
+export interface SecretDeps {
+  store: ApiSecretStore;
+  sealer: Sealer;
+  mailer: MailerTrigger;
+}
+
+/** In-memory secrets for the local server, with an outbox instead of email. */
+export function localSecrets(config: AppConfig, logger: Logger, now: () => number = Date.now) {
+  const store = new MemorySecretStore();
+  const vault = new LocalVault();
+  const outbox = new OutboxTransport();
+  const mailer = new InlineMailerTrigger(
+    {
+      store,
+      opener: vault,
+      transport: outbox,
+      logger,
+      now,
+      config: {
+        environment: config.environment,
+        eventId: config.eventId,
+        eventName: config.eventName,
+        appUrl: config.appUrl,
+        mode: config.revealMode,
+        sender: config.emailSender ?? 'reveal@localhost',
+        recipients: config.emailRecipients.length ? config.emailRecipients : ['host@localhost'],
+      },
+    },
+    logger,
+  );
+  return { store, vault, outbox, deps: { store, sealer: vault, mailer } satisfies SecretDeps };
 }
 
 const MAX_ATTEMPTS = 4;
+const DOCTOR_WINDOW_MS = 15 * 60 * 1000;
+const DOCTOR_LIMIT = 30;
+const CODE_WINDOW_MS = 15 * 60 * 1000;
+const CODE_LIMIT = 10;
+const CODE_REJECTED = 'That code doesn’t unlock the reveal. Check it and try again.';
+const LINK_INVALID = 'This link isn’t valid or has expired. Please ask the parents for a new one.';
 const SIGN_IN_WINDOW_MS = 15 * 60 * 1000;
 const SIGN_IN_LIMIT = 10;
 
@@ -72,6 +132,8 @@ export class EventService {
   private readonly now: () => number;
   private readonly logger: Logger;
   private readonly passwordHash: () => Promise<string | undefined>;
+  private readonly secrets: SecretDeps;
+  private readonly randomPick: (max: number) => number;
   /** Warm Lambda containers reuse the last snapshot while the revision is unchanged. */
   private cache: { revision: number; snapshot: EventSnapshot } | null = null;
 
@@ -82,6 +144,15 @@ export class EventService {
     this.now = deps.clock ?? Date.now;
     this.logger = deps.logger ?? silentLogger;
     this.passwordHash = deps.passwordHash ?? (async () => deps.config.adminPasswordHash);
+    if (!deps.secrets && deps.config.environment !== 'local') {
+      throw new Error('Deployed environments need the KMS-backed secret store');
+    }
+    this.secrets = deps.secrets ?? localSecrets(deps.config, this.logger, this.now).deps;
+    this.randomPick = deps.randomPick ?? randomInt;
+  }
+
+  get mode(): RevealMode {
+    return this.config.revealMode;
   }
 
   private get eventId() {
@@ -168,7 +239,21 @@ export class EventService {
   }
 
   async adminView(): Promise<AdminView> {
-    return toAdminView(await this.current(), this.now(), this.config.joinUrl);
+    const state = await this.current();
+    const view = toAdminView(state, this.now(), this.config.joinUrl, this.mode);
+    const { selectionId } = state.doctor;
+    if (state.doctor.status === 'SUBMITTED' && selectionId) {
+      const meta = await this.secrets.store.getSelectionMeta(this.eventId, selectionId);
+      if (meta) {
+        view.doctor.email = {
+          status: meta.email.status,
+          attempts: meta.email.attempts,
+          sentAt: meta.email.sentAt === null ? null : new Date(meta.email.sentAt).toISOString(),
+        };
+        if (meta.email.status === 'SENT') view.doctor.status = 'CODE_SENT';
+      }
+    }
+    return view;
   }
 
   /** The complete keepsake. Always read fresh (strongly consistent), never from the cache. */
@@ -254,11 +339,207 @@ export class EventService {
     this.logger.info('host command', { command: command.type });
   }
 
-  /** Placeholder until the secure reveal workflow (Milestone 6). Never unlocks anything. */
-  async submitRevealCode(): Promise<{ accepted: boolean; message: string }> {
+  /* ---------- the secret: doctor link, sealed answer, reveal code ---------- */
+
+  private sealContext(selectionId: string) {
+    return { environment: this.config.environment, eventId: this.eventId, selectionId };
+  }
+
+  private async limit(key: string, windowMs: number, max: number): Promise<void> {
+    const allowed = await this.repository.consumeRateLimit(key, windowMs, max, this.now());
+    if (!allowed) throw new AppError('RATE_LIMITED', 'Too many attempts. Please wait a few minutes.', 429);
+  }
+
+  /**
+   * Issues the one valid doctor link. The token is returned once, inside the
+   * URL fragment (browsers don't send fragments to servers or log them); only
+   * its hash is stored. A new link retires the previous one.
+   */
+  async createDoctorLink(): Promise<DoctorLinkResult> {
+    const { token, expiresAt } = await this.issueLink();
+    const base = this.config.appUrl || '';
+    this.logger.info('doctor link issued');
+    return { url: `${base}/doctor#${token}`, expiresAt: new Date(expiresAt).toISOString() };
+  }
+
+  private async issueLink(): Promise<{ token: string; linkId: string; expiresAt: number }> {
+    const token = randomToken(32);
+    const linkId = `lnk_${randomToken(12)}`;
+    const expiresAt = this.now() + this.config.doctorLinkMs;
+    // Store the link first: if the state change is refused, the link simply never becomes current.
+    await this.secrets.store.putDoctorLink({ tokenHash: doctorTokenHash(token), eventId: this.eventId, linkId, expiresAt });
+    await this.mutate((draft) => issueDoctorLink(draft, { linkId, expiresAt }));
+    return { token, linkId, expiresAt };
+  }
+
+  /** The link record, if this token belongs to this event. Never says why a link is unusable. */
+  private async findLink(token: string): Promise<DoctorLinkRecord> {
+    const link = await this.secrets.store.findDoctorLink(doctorTokenHash(token));
+    if (!link || link.eventId !== this.eventId) throw new AppError('INVALID_LINK', LINK_INVALID, 404);
+    return link;
+  }
+
+  /** Checks a doctor link. Read-only: opening or refreshing the page never creates anything. */
+  async doctorSession(token: string, clientKey: string): Promise<DoctorSessionResult> {
+    await this.limit(`doctor:${sha256(clientKey)}`, DOCTOR_WINDOW_MS, DOCTOR_LIMIT);
+    const link = await this.findLink(token);
+    const { state } = await this.loadFresh();
+    const { doctor } = state;
+    if (doctor.status === 'SUBMITTED' && doctor.linkId === link.linkId) return { mode: this.mode, status: 'SEALED' };
+    if (doctor.status !== 'LINK_ISSUED' || !isCurrentDoctorLink(state, link.linkId, this.now())) {
+      throw new AppError('INVALID_LINK', LINK_INVALID, 404);
+    }
+    return { mode: this.mode, status: 'READY' };
+  }
+
+  /**
+   * Seals the doctor's answer. The choice is encrypted at once and dropped; a
+   * random code is generated, sealed with it and claimed as unique; then the
+   * event records *that* an answer exists, and the mailer is asked to send the
+   * code. Double clicks and retries (same submissionId) are harmless and
+   * never create a second code.
+   */
+  async submitDoctorSelection(
+    input: { token: string; choice: DoctorChoice; submissionId: string },
+    clientKey: string,
+  ): Promise<{ status: 'SEALED' }> {
+    await this.limit(`doctor:${sha256(clientKey)}`, DOCTOR_WINDOW_MS, DOCTOR_LIMIT);
+    const link = await this.findLink(input.token);
+    await this.sealSelection(link, input.choice, input.submissionId);
+    return { status: 'SEALED' };
+  }
+
+  /** Returns the plaintext code only to callers inside the service (the test-mode simulation). */
+  private async sealSelection(link: DoctorLinkRecord, choice: DoctorChoice, submissionId: string): Promise<{ code: string | null }> {
+    const state = (await this.loadFresh()).state;
+    const alreadySealedHere = state.doctor.status === 'SUBMITTED' && state.doctor.linkId === link.linkId;
+    if (!alreadySealedHere && !isCurrentDoctorLink(state, link.linkId, this.now())) {
+      throw new AppError('INVALID_LINK', LINK_INVALID, 404);
+    }
+    const selectionId = selectionIdFor(link.linkId);
+    const existing = await this.secrets.store.getSelectionMeta(this.eventId, selectionId);
+    if (existing) {
+      if (existing.submissionId !== submissionId) {
+        throw new AppError('ALREADY_SUBMITTED', 'An answer has already been sealed with this link.', 409);
+      }
+      await this.recordSelection(link.linkId, selectionId); // finishes an interrupted earlier attempt
+      return { code: null };
+    }
+
+    const context = this.sealContext(selectionId);
+    const choiceCiphertext = await this.secrets.sealer.seal('doctor-selection', choice, context);
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      const code = generateRevealCode(this.randomPick);
+      const result = await this.secrets.store.putSelection({
+        eventId: this.eventId,
+        selectionId,
+        linkId: link.linkId,
+        submissionId,
+        generation: state.doctor.generation,
+        choiceCiphertext,
+        codeCiphertext: await this.secrets.sealer.seal('reveal-code', code, context),
+        codeHash: revealCodeHash(this.config, code),
+        createdAt: this.now(),
+      });
+      if (result === 'code-taken') continue; // astronomically rare; draw again
+      if (result === 'exists') return this.sealSelection(link, choice, submissionId); // lost a race to a double click
+      await this.recordSelection(link.linkId, selectionId);
+      return { code };
+    }
+    throw new AppError('NOT_AVAILABLE', 'Please try again.', 503);
+  }
+
+  /** Marks the answer as sealed in the event; the first time, asks for the code email. */
+  private async recordSelection(linkId: string, selectionId: string): Promise<void> {
+    const outcome = await this.mutate((draft, now) => recordDoctorSelection(draft, { linkId, selectionId }, now));
+    if (outcome === 'recorded') {
+      this.logger.info('doctor answer sealed');
+      await this.requestCodeEmail(selectionId);
+    }
+  }
+
+  private async requestCodeEmail(selectionId: string): Promise<void> {
+    try {
+      await this.secrets.mailer.trigger({ eventId: this.eventId, selectionId });
+    } catch (error) {
+      // The answer is sealed either way; the host can send the code again.
+      this.logger.error('could not request the reveal code email', { error: (error as Error).name });
+    }
+  }
+
+  /** Sends the same code again (never a new one). */
+  async resendRevealCode(): Promise<void> {
+    const { doctor } = (await this.loadFresh()).state;
+    if (doctor.status !== 'SUBMITTED' || !doctor.selectionId) {
+      throw new AppError('WRONG_PHASE', 'There is no sealed answer yet.', 409);
+    }
+    await this.secrets.mailer.trigger({ eventId: this.eventId, selectionId: doctor.selectionId });
+    this.logger.info('reveal code email requested again');
+  }
+
+  /**
+   * Throws away the sealed answer, its code and the doctor link, so the doctor
+   * can be asked again with a new link. Old codes stop working at once (the
+   * event no longer points at their answer, and the answer is retired).
+   */
+  async resetSecret(): Promise<void> {
+    const { retiredSelectionId } = await this.mutate((draft) => resetSecret(draft));
+    if (retiredSelectionId) await this.secrets.store.retireSelection(this.eventId, retiredSelectionId);
+    this.logger.warn('secret reset by the host');
+  }
+
+  /**
+   * TEST mode only: plays the doctor with a random answer, so a rehearsal can
+   * run end to end without anyone knowing (or choosing) the outcome. Returns
+   * the code, which is fine for a rehearsal and impossible in LIVE mode.
+   */
+  async simulateDoctor(): Promise<SimulatedDoctorResult> {
+    if (this.mode !== 'TEST') throw new AppError('NOT_FOUND', 'Not found.', 404);
+    const { doctor } = (await this.loadFresh()).state;
+    if (doctor.status === 'SUBMITTED') await this.resetSecret();
+    const { token } = await this.issueLink();
+    const choice: DoctorChoice = this.randomPick(2) === 0 ? 'BOY' : 'GIRL';
+    const { code } = await this.sealSelection(await this.findLink(token), choice, randomUUID());
+    if (!code) throw new AppError('NOT_AVAILABLE', 'Please try again.', 503);
+    this.logger.info('doctor simulated (test mode)');
+    return { code };
+  }
+
+  /**
+   * Checks the host's code and, if it belongs to the answer sealed for this
+   * event right now, starts the reveal. Every way a code can be wrong gets the
+   * same answer. Attempts are limited per event.
+   */
+  async submitRevealCode(code: string): Promise<RevealCodeResult> {
+    const { state } = await this.loadFresh();
+    if (state.phase !== 'REVEAL') {
+      return { accepted: false, message: 'Start the reveal first, then enter the code.' };
+    }
+    await this.limit(`reveal-code:${this.eventId}`, CODE_WINDOW_MS, CODE_LIMIT);
+    const normalized = normalizeRevealCode(code);
+    if (!normalized) return { accepted: false, message: 'Codes look like R7KM-92PX-L4QT: 12 letters and digits.' };
+
+    const found = await this.secrets.store.findCode(revealCodeHash(this.config, normalized));
+    const meta = found && found.eventId === this.eventId ? await this.secrets.store.getSelectionMeta(this.eventId, found.selectionId) : null;
+    if (!found || !meta || meta.status !== 'ACTIVE') {
+      this.logger.warn('reveal code rejected');
+      return { accepted: false, message: CODE_REJECTED };
+    }
+    try {
+      await this.mutate((draft, now) => authorizeReveal(draft, { selectionId: found.selectionId, delayMs: this.config.revealDelayMs }, now));
+    } catch (error) {
+      if (error instanceof DomainError && error.code === 'NOT_FOUND') {
+        this.logger.warn('reveal code rejected');
+        return { accepted: false, message: CODE_REJECTED };
+      }
+      throw error;
+    }
+    const revealAt = (await this.loadFresh()).state.reveal.revealAt;
+    this.logger.info('reveal code accepted');
     return {
-      accepted: false,
-      message: 'Reveal codes are verified by the secure reveal service, which arrives in a later milestone. Nothing was unlocked.',
+      accepted: true,
+      message: 'The code is right. The reveal has begun.',
+      ...(revealAt === null ? {} : { revealAt: new Date(revealAt).toISOString() }),
     };
   }
 

@@ -3,9 +3,12 @@ import {
   adminSignInSchema,
   babyMessageSchema,
   castVoteSchema,
+  doctorSelectionSchema,
+  doctorSessionSchema,
   quizAnswerSchema,
   registerGuestSchema,
   revealCodeRequestSchema,
+  secretResetSchema,
 } from '@olu/shared';
 import type { z } from 'zod';
 import { AppError, unauthorized } from '../app/errors';
@@ -71,13 +74,34 @@ const routes: Record<string, Handler> = {
   },
   'POST /v1/admin/reveal-code': async ({ service, admin, body }) => {
     await admin();
-    body(revealCodeRequestSchema);
-    return json(200, await service.submitRevealCode());
+    return json(200, await service.submitRevealCode(body(revealCodeRequestSchema).code));
+  },
+  'POST /v1/admin/doctor/link': async ({ service, admin }) => {
+    await admin();
+    return json(201, await service.createDoctorLink());
+  },
+  'POST /v1/admin/doctor/resend': async ({ service, admin }) => {
+    await admin();
+    await service.resendRevealCode();
+    return noContent();
+  },
+  'POST /v1/admin/doctor/reset': async ({ service, admin, body }) => {
+    await admin();
+    body(secretResetSchema);
+    await service.resetSecret();
+    return noContent();
+  },
+  'POST /v1/admin/doctor/simulate': async ({ service, admin }) => {
+    await admin();
+    return json(201, await service.simulateDoctor());
   },
 
-  // The doctor workflow lives in a separate, narrowly privileged component (Milestone 6).
-  'POST /v1/doctor/selections': async () => {
-    throw new AppError('NOT_AVAILABLE', 'Doctor mode arrives in a later milestone.', 501);
+  // The doctor. The token travels in the body: URLs end up in access logs.
+  'POST /v1/doctor/session': async ({ service, body, request }) =>
+    json(200, await service.doctorSession(body(doctorSessionSchema).token, request.sourceIp)),
+  'POST /v1/doctor/selection': async ({ service, body, request }) => {
+    const { token, choice, submissionId } = body(doctorSelectionSchema);
+    return json(200, await service.submitDoctorSelection({ token, choice, submissionId }, request.sourceIp));
   },
 
   // Local development only (DEV_ROUTES=true; 404 everywhere else), and host-only.
@@ -99,7 +123,6 @@ export function createRouter(service: EventService, logger: Logger) {
   return async function route(request: ApiRequest): Promise<ApiResponse> {
     const started = Date.now();
     const routeKey = `${request.method.toUpperCase()} ${request.path.replace(/\/+$/, '') || '/'}`;
-    const doctorLink = /^GET \/v1\/doctor\/links\/[^/]+$/.test(routeKey);
     const handler = routes[routeKey];
 
     const ctx: Context = {
@@ -137,7 +160,6 @@ export function createRouter(service: EventService, logger: Logger) {
     let response: ApiResponse;
     let errorCode: string | undefined;
     try {
-      if (doctorLink) throw new AppError('NOT_AVAILABLE', 'Doctor mode arrives in a later milestone.', 501);
       if (!handler) throw new AppError('NOT_FOUND', 'Not found.', 404);
       response = await handler(ctx);
     } catch (error) {
@@ -155,7 +177,7 @@ export function createRouter(service: EventService, logger: Logger) {
 
     logger.info('request', {
       requestId: request.requestId,
-      route: handler || doctorLink ? routeKey.replace(/\/links\/[^/]+$/, '/links/:token') : 'unknown',
+      route: handler ? routeKey : 'unknown',
       status: response.status,
       ms: Date.now() - started,
       ...(errorCode ? { code: errorCode } : {}),

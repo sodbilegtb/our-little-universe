@@ -3,9 +3,13 @@ import { networkInterfaces } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import { createApp, createRepository } from '../app/createApp';
+import { localSecrets } from '../app/EventService';
+import { createLogger } from '../app/logger';
 import { loadConfig } from '../config/config';
+import { NOT_YET } from '../handlers/reveal';
+import { readRevealResult } from '../reveal/revealResult';
 import { hashPassword } from '../security/password';
-import { randomToken } from '../security/tokens';
+import { parseBearer, randomToken } from '../security/tokens';
 import type { ApiRequest } from '../http/types';
 
 /*
@@ -19,6 +23,10 @@ import type { ApiRequest } from '../http/types';
  *   REPOSITORY=dynamodb TABLE_NAME=... DYNAMODB_ENDPOINT=http://localhost:8000   use DynamoDB Local
  *   MEMORY_FILE=path            where in-memory data is mirrored ("none" to disable)
  *   ALLOWED_ORIGINS=a,b         CORS origins (default: any, local only)
+ *
+ * Secrets are kept in memory with a key that only lives for this run, and the
+ * reveal code "email" lands in an outbox instead of being sent: it is printed
+ * here, and GET /v1/dev/outbox (host only) returns it. Always TEST mode.
  */
 
 const port = Number(process.env.PORT ?? 8787);
@@ -37,7 +45,23 @@ const config = loadConfig({
 
 const memoryFile =
   process.env.MEMORY_FILE === 'none' ? undefined : resolve(process.env.MEMORY_FILE ?? '.local-data/event.json');
-const app = createApp(config, createRepository(config, memoryFile));
+const repository = createRepository(config, memoryFile);
+const secrets = localSecrets(config, createLogger(config.logLevel, { environment: 'local' }));
+const app = createApp(config, repository, { secrets: secrets.deps });
+const outboxPrinted = new Set<string>();
+
+/** The local stand-in for the reveal Lambda (GET /v1/reveal/result). */
+async function revealResult() {
+  const result = await readRevealResult({
+    loadControl: async () => (await repository.load(config.eventId))?.state ?? null,
+    store: secrets.store,
+    opener: secrets.vault,
+    environment: config.environment,
+    eventId: config.eventId,
+    now: Date.now,
+  });
+  return result ? { status: 200, body: result } : { status: 409, body: NOT_YET };
+}
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map((o) => o.trim());
 
 function corsHeaders(origin: string | undefined): Record<string, string> {
@@ -71,6 +95,22 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
     return;
   }
   const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
+  const json = (status: number, body: unknown) =>
+    res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...cors }).end(JSON.stringify(body));
+  if (req.method === 'GET' && url.pathname === '/v1/reveal/result') {
+    const { status, body } = await revealResult();
+    json(status, body);
+    return;
+  }
+  if (req.method === 'GET' && url.pathname === '/v1/dev/outbox') {
+    try {
+      await app.service.requireAdmin(parseBearer(req.headers.authorization));
+      json(200, secrets.outbox.sent.map(({ subject, text, to, messageId }) => ({ subject, text, to, messageId })));
+    } catch {
+      json(401, { error: { code: 'UNAUTHORIZED', message: 'Please sign in to the host desk again.' } });
+    }
+    return;
+  }
   const headers: ApiRequest['headers'] = {};
   for (const [name, value] of Object.entries(req.headers)) headers[name] = Array.isArray(value) ? value.join(',') : value;
   const response = await app.route({
@@ -83,6 +123,11 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
     requestId: randomUUID(),
   });
   res.writeHead(response.status, { ...response.headers, ...cors }).end(response.body);
+  for (const mail of secrets.outbox.sent) {
+    if (outboxPrinted.has(mail.messageId)) continue;
+    outboxPrinted.add(mail.messageId);
+    console.log(`\n  ✉  ${mail.subject} → ${mail.to.join(', ')}\n${mail.text.replace(/^/gm, '     ')}\n`);
+  }
 });
 
 server.listen(port, '0.0.0.0', () => {

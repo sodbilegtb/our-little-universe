@@ -1,9 +1,10 @@
-import type {
-  AnswerRecord,
-  EventState,
-  GuestRecord,
-  MessageRecord,
-  VoteRecord,
+import {
+  upgradeState,
+  type AnswerRecord,
+  type EventState,
+  type GuestRecord,
+  type MessageRecord,
+  type VoteRecord,
 } from '@olu/event-core';
 
 /*
@@ -26,9 +27,16 @@ export function controlOf(state: EventState): ControlState {
 }
 
 /** When the open question times out (deadline plus grace), or null. Lets the cheap revision check trigger settling. */
+/** When the next time-based transition is due (a question closing, the reveal moment). */
 export function settleAt(control: ControlState): number | null {
-  if (control.phase !== 'QUIZ' || control.quiz.stage !== 'QUESTION_OPEN' || control.quiz.closesAt === null) return null;
-  return control.quiz.closesAt + control.settings.answerGraceMs;
+  if (control.phase === 'QUIZ' && control.quiz.stage === 'QUESTION_OPEN' && control.quiz.closesAt !== null) {
+    return control.quiz.closesAt + control.settings.answerGraceMs;
+  }
+  if (control.reveal?.status === 'REVEALING' && control.reveal.revealAt != null) {
+    // settle() switches at revealAt itself; the revision check fires after it.
+    return control.reveal.revealAt - 1;
+  }
+  return null;
 }
 
 export interface Collections {
@@ -43,7 +51,7 @@ export function assembleState(control: ControlState, collections: Collections, r
   const messages = [...collections.messages].sort(
     (a, b) => a.order - b.order || a.submittedAt - b.submittedAt || a.id.localeCompare(b.id),
   );
-  return {
+  return upgradeState({
     ...structuredClone(control),
     revision,
     guests: [...collections.guests].sort((a, b) => a.joinedAt - b.joinedAt || a.id.localeCompare(b.id)),
@@ -54,7 +62,7 @@ export function assembleState(control: ControlState, collections: Collections, r
       items: messages,
       nextOrder: messages.reduce((max, m) => Math.max(max, m.order + 1), 0),
     },
-  };
+  });
 }
 
 export interface AnswerKey {

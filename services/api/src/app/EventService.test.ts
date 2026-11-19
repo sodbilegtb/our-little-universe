@@ -177,10 +177,6 @@ describe.each(backends)('event service on $name', ({ create }) => {
     expect(await codeOf(service.adminSignIn('host password 123', '10.0.0.2'))).toBe('RATE_LIMITED');
     expect(await codeOf(service.adminSignIn('host password 123', '10.0.0.3'))).toBe('ok');
   });
-
-  it('never unlocks the reveal yet', async () => {
-    expect((await service.submitRevealCode()).accepted).toBe(false);
-  });
 });
 
 describe('event service configuration', () => {

@@ -6,6 +6,7 @@ import { toApiRequest } from '../handlers/http';
 import { MemoryEventRepository } from '../repositories/memory/MemoryEventRepository';
 import { hashPassword } from '../security/password';
 import { serverIds } from '../security/tokens';
+import type { AppConfig } from '../config/config';
 import { testConfig } from '../testing/support';
 import { createRouter } from './router';
 import type { ApiRequest } from './types';
@@ -15,7 +16,11 @@ beforeAll(async () => {
   passwordHash = await hashPassword('host password 123');
 });
 
-function setup(overrides: Record<string, string> = {}, repository = new MemoryEventRepository()) {
+function setup(
+  overrides: Record<string, string> = {},
+  repository = new MemoryEventRepository(),
+  patch: Partial<AppConfig> = {},
+) {
   const logs: { message: string; fields?: Record<string, unknown> }[] = [];
   const logger: Logger = {
     debug: () => {},
@@ -24,7 +29,7 @@ function setup(overrides: Record<string, string> = {}, repository = new MemoryEv
     error: (message, fields) => logs.push({ message, fields }),
   };
   const service = new EventService({
-    config: testConfig({ ADMIN_PASSWORD_HASH: passwordHash, ...overrides }),
+    config: { ...testConfig({ ADMIN_PASSWORD_HASH: passwordHash, ...overrides }), ...patch },
     repository,
     ids: serverIds,
   });
@@ -116,12 +121,38 @@ describe('HTTP API', () => {
     expect((await call('POST', '/v1/admin/commands', { body: { type: 'START_QUIZ' }, auth })).json!.error.code).toBe('WRONG_PHASE');
   });
 
-  it('keeps the doctor and reveal workflow closed until Milestone 6', async () => {
-    const { call, signIn } = setup();
-    expect((await call('GET', '/v1/doctor/links/some-token')).status).toBe(501);
-    expect((await call('POST', '/v1/doctor/selections', { body: { choice: 'BOY' } })).status).toBe(501);
-    const reveal = await call('POST', '/v1/admin/reveal-code', { body: { code: 'R7KM-92PX-L4QT' }, auth: `Bearer ${await signIn()}` });
-    expect(reveal.json!.accepted).toBe(false);
+  it('runs the doctor workflow over HTTP, with the token only in request bodies', async () => {
+    const { call, signIn, logs } = setup({ PUBLIC_APP_URL: 'https://app.example' });
+    const auth = `Bearer ${await signIn()}`;
+    expect((await call('POST', '/v1/admin/doctor/link')).status).toBe(401);
+    const link = await call('POST', '/v1/admin/doctor/link', { auth });
+    expect(link.status).toBe(201);
+    expect(link.json!.url).toMatch(/^https:\/\/app\.example\/doctor#[A-Za-z0-9_-]{43}$/);
+    const token = String(link.json!.url).split('#')[1];
+
+    expect((await call('POST', '/v1/doctor/session', { body: { token } })).json).toEqual({ mode: 'TEST', status: 'READY' });
+    expect((await call('POST', '/v1/doctor/session', { body: { token: 'x'.repeat(43) } })).status).toBe(404);
+    const unconfirmed = { token, choice: 'GIRL', submissionId: 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d' };
+    expect((await call('POST', '/v1/doctor/selection', { body: unconfirmed })).status).toBe(400);
+    const sealed = await call('POST', '/v1/doctor/selection', { body: { ...unconfirmed, confirmed: true } });
+    expect(sealed.json).toEqual({ status: 'SEALED' });
+    expect(sealed.body).not.toMatch(/GIRL|BOY/);
+    expect((await call('POST', '/v1/doctor/session', { body: { token } })).json!.status).toBe('SEALED');
+
+    expect((await call('POST', '/v1/admin/doctor/reset', { body: {}, auth })).status).toBe(400);
+    expect((await call('POST', '/v1/admin/doctor/reset', { body: { confirm: 'RESET' }, auth })).status).toBe(204);
+    expect((await call('POST', '/v1/doctor/session', { body: { token } })).status).toBe(404);
+    expect(JSON.stringify(logs)).not.toContain(token);
+  });
+
+  it('allows the doctor simulation in test mode only', async () => {
+    const test = setup();
+    expect((await test.call('POST', '/v1/admin/doctor/simulate', { auth: `Bearer ${await test.signIn()}` })).json!.code).toMatch(
+      /^[2-9A-HJKMNP-Z]{4}-[2-9A-HJKMNP-Z]{4}-[2-9A-HJKMNP-Z]{4}$/,
+    );
+    // The config itself refuses LIVE outside prod; patched here to test the service's own check.
+    const live = setup({}, undefined, { revealMode: 'LIVE' });
+    expect((await live.call('POST', '/v1/admin/doctor/simulate', { auth: `Bearer ${await live.signIn()}` })).status).toBe(404);
   });
 
   it('hides development routes outside local development', async () => {
