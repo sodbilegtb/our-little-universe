@@ -35,6 +35,8 @@ export type RevealMode = 'TEST' | 'LIVE';
 /** Times only. The result itself comes from a separate endpoint, and only from `revealAt` on. */
 export interface RevealView {
   status: RevealStatus;
+  /** ISO time the host's code was accepted: the TV sequence starts here. */
+  startedAt: string | null;
   /** ISO time from which the result may be shown (server clock). */
   revealAt: string | null;
 }

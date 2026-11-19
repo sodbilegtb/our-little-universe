@@ -454,7 +454,7 @@ export const mockEventApi: EventApi = {
       'tv',
       (): RevealResult | null => {
         const { phase, reveal, doctor } = read();
-        if (phase !== 'REVEAL' || reveal.revealAt === null || Date.now() < reveal.revealAt) return null;
+        if ((phase !== 'REVEAL' && phase !== 'FINISHED') || reveal.revealAt === null || Date.now() < reveal.revealAt) return null;
         if ((reveal.status !== 'REVEALING' && reveal.status !== 'REVEALED') || !doctor.selectionId) return null;
         const sealed = loadSecret().selections[doctor.selectionId];
         if (!sealed || sealed.status !== 'ACTIVE') return null;

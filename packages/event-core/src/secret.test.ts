@@ -128,6 +128,7 @@ describe('reveal authorization', () => {
     }
     expect(toTvView(h.state, h.clock.now, '').reveal).toEqual({
       status: 'REVEALING',
+      startedAt: new Date(h.clock.now).toISOString(),
       revealAt: new Date(h.clock.now + 26_000).toISOString(),
     });
   });

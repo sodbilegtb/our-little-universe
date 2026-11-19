@@ -133,7 +133,7 @@ export function toGuestView(state: EventState, guestId: string | null, now: numb
 }
 
 function revealView(state: EventState): RevealView {
-  return { status: state.reveal.status, revealAt: iso(state.reveal.revealAt) };
+  return { status: state.reveal.status, startedAt: iso(state.reveal.startedAt), revealAt: iso(state.reveal.revealAt) };
 }
 
 /**

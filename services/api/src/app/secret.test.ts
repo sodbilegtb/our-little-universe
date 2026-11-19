@@ -297,7 +297,11 @@ describe.each(backends)('the secret on $name', ({ create }) => {
     expect(accepted.accepted).toBe(true);
     const revealAt = Date.parse(accepted.revealAt!);
     expect(revealAt - w.clock.now).toBe(26_000);
-    expect((await w.service.tvView()).reveal).toEqual({ status: 'REVEALING', revealAt: accepted.revealAt });
+    expect((await w.service.tvView()).reveal).toEqual({
+      status: 'REVEALING',
+      startedAt: new Date(revealAt - 26_000).toISOString(),
+      revealAt: accepted.revealAt,
+    });
     expect(await w.reveal()).toBeNull(); // countdown running
     w.clock.tick(25_999);
     expect(await w.reveal()).toBeNull();
@@ -307,6 +311,9 @@ describe.each(backends)('the secret on $name', ({ create }) => {
     // entering the code again doesn't restart anything
     expect((await w.service.submitRevealCode(code)).accepted).toBe(true);
     expect((await w.service.tvView()).reveal.revealAt).toBe(accepted.revealAt);
+    // still there after the evening is finished, for the thank-you screen
+    await w.command('FINISH_EVENT');
+    expect(await w.reveal()).toEqual({ result: 'GIRL', revealAt: accepted.revealAt });
   });
 
   it('17. every response is identical whether the answer is BOY or GIRL', async () => {

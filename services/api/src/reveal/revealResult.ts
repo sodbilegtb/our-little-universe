@@ -23,11 +23,12 @@ export interface RevealDeps {
  * The only code path that opens the doctor's answer. It does so only after the
  * host's code was accepted (REVEALING or REVEALED) and only from `revealAt` on,
  * judged by the server clock. Before that it returns null, whatever the reason,
- * so a caller learns nothing from asking early.
+ * so a caller learns nothing from asking early. Once revealed, the answer stays
+ * available after the host finishes the evening (the thank-you screen shows it).
  */
 export async function readRevealResult(deps: RevealDeps): Promise<RevealResult | null> {
   const control = await deps.loadControl();
-  if (!control || control.phase !== 'REVEAL') return null;
+  if (!control || (control.phase !== 'REVEAL' && control.phase !== 'FINISHED')) return null;
   const { reveal, doctor } = control;
   if ((reveal.status !== 'REVEALING' && reveal.status !== 'REVEALED') || reveal.revealAt === null) return null;
   if (deps.now() < reveal.revealAt || !doctor.selectionId) return null;
