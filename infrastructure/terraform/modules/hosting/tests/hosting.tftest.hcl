@@ -28,7 +28,7 @@ run "security_headers_and_spa" {
   }
 
   assert {
-    condition     = length(jsondecode(aws_amplify_app.web.custom_headers).customHeaders) == 2
+    condition     = length(yamldecode(aws_amplify_app.web.custom_headers).customHeaders) == 2
     error_message = "The headers use the documented spec (a top-level customHeaders key): creating an app refuses anything else."
   }
 

@@ -35,12 +35,12 @@ resource "aws_amplify_app" "web" {
     status = "200"
   }
 
-  # The documented spec: a top-level customHeaders key. JSON is valid YAML, so
-  # jsonencode writes it. Creating an app accepts only this form; Amplify then
+  # The documented YAML spec with a top-level customHeaders key, as dev was
+  # created with. Creating an app accepts only this form; Amplify then
   # stores just the list, so Terraform would report a change in every plan.
   # Hence ignore_changes below: the headers are set when the app is created.
   # To change them on an existing app, see docs/deployment.md (Troubleshooting).
-  custom_headers = jsonencode({ customHeaders = [
+  custom_headers = yamlencode({ customHeaders = [
     {
       pattern = "**"
       headers = [
