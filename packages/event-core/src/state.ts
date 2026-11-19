@@ -63,6 +63,11 @@ export interface EventState {
   eventName: string;
   /** Increments on every change. Clients compare it to know when to refetch. */
   revision: number;
+  /**
+   * Test mode only: which rehearsal run this is. Starting a new rehearsal
+   * bumps it; what earlier runs stored is kept but no longer part of the event.
+   */
+  run: number;
   phase: EventPhase;
   guests: GuestRecord[];
   voting: {
@@ -121,11 +126,15 @@ export const INITIAL_REVEAL: RevealState = { status: 'LOCKED', startedAt: null, 
 
 /**
  * Fills in fields added after an event was first stored (events created before
- * Milestone 6 only had `doctor.status` and `reveal.status`).
+ * Milestone 6 only had `doctor.status` and `reveal.status`, before Milestone 7
+ * no `run`).
  */
-export function upgradeState<T extends Pick<EventState, 'doctor' | 'reveal'>>(state: T): T {
+export function upgradeState<T extends Pick<EventState, 'doctor' | 'reveal'> & { run?: number }>(
+  state: T,
+): T & { run: number } {
   return {
     ...state,
+    run: state.run ?? 0,
     doctor: { ...INITIAL_DOCTOR, ...state.doctor },
     reveal: { ...INITIAL_REVEAL, ...state.reveal },
   };
@@ -149,6 +158,7 @@ export function createEventState(input: CreateEventInput): EventState {
     eventId: input.eventId,
     eventName: input.eventName,
     revision: 1,
+    run: 0,
     phase: 'LOBBY',
     guests: [],
     voting: { open: false, votes: {} },

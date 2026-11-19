@@ -6,3 +6,4 @@ export * from './projections';
 export * from './secret';
 export * from './simulate';
 export * from './examples';
+export * from './rehearsal';

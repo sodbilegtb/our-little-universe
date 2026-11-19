@@ -126,3 +126,6 @@ export const doctorSelectionSchema = z
   })
   .strict();
 export const secretResetSchema = z.object({ confirm: z.literal('RESET') }).strict();
+
+/** Test mode only: start the evening over as a new rehearsal run. */
+export const newRehearsalSchema = z.object({ confirm: z.literal('NEW') }).strict();
