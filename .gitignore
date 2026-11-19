@@ -27,3 +27,6 @@ apps/web/web-deploy.zip
 
 # Lock files from `terraform test` in the modules (the environments keep theirs)
 infrastructure/terraform/modules/**/.terraform.lock.hcl
+
+# Archives of the evening (guest names, messages): private, never committed
+exports/

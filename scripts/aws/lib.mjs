@@ -68,3 +68,36 @@ export function optionalOutput(env, name) {
   if (!outputCache.has(env)) outputCache.set(env, json('terraform', [`-chdir=infrastructure/terraform/environments/${env}`, 'output', '-json']));
   return outputCache.get(env)[name]?.value;
 }
+
+/** Asks without echoing what is typed (for passwords). */
+export async function askHidden(question) {
+  const { createInterface } = await import('node:readline');
+  return new Promise((resolve) => {
+    const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: true });
+    let muted = false;
+    rl._writeToOutput = (s) => {
+      if (!muted) process.stdout.write(s);
+    };
+    rl.question(question, (answer) => {
+      rl.close();
+      process.stdout.write('\n');
+      resolve(answer);
+    });
+    muted = true;
+  });
+}
+
+/** Signs in to the host desk API and returns a bearer token. */
+export async function hostToken(api) {
+  const password = process.env.ADMIN_PASSWORD || (await askHidden('Host password: '));
+  const response = await fetch(`${api}/v1/admin/sessions`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ password }),
+  });
+  if (response.status !== 201) {
+    console.error(`Host sign-in failed (HTTP ${response.status}).`);
+    process.exit(1);
+  }
+  return (await response.json()).token;
+}
