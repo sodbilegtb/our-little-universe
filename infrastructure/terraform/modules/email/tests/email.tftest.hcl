@@ -105,3 +105,50 @@ run "dns_flag_needs_a_domain" {
     error_message = "A single sender address has no DKIM records to write."
   }
 }
+
+run "reuses_identities_of_another_environment" {
+  command = apply
+
+  variables {
+    sender_address      = "reveal@example.com"
+    sender_domain       = "example.com"
+    recipient_addresses = ["parent@example.com"]
+    manage_dns_records  = true
+    manage_identities   = false
+  }
+
+  override_data {
+    target = data.aws_sesv2_email_identity.existing
+    values = {
+      arn                         = "arn:aws:ses:eu-central-1:123456789012:identity/existing"
+      verified_for_sending_status = true
+    }
+  }
+
+  assert {
+    condition     = length(aws_sesv2_email_identity.this) == 0 && length(aws_route53_record.dkim) == 0
+    error_message = "Nothing is created: the identities and their DNS records belong to the other environment."
+  }
+
+  assert {
+    condition     = length(output.identity_arns) == 2
+    error_message = "The mailer may still send as (and to) the reused identities."
+  }
+}
+
+run "refuses_unverified_identities" {
+  command = plan
+
+  variables {
+    sender_domain       = "example.com"
+    recipient_addresses = ["parent@example.com"]
+    manage_identities   = false
+  }
+
+  override_data {
+    target = data.aws_sesv2_email_identity.existing
+    values = { verified_for_sending_status = false }
+  }
+
+  expect_failures = [data.aws_sesv2_email_identity.existing]
+}

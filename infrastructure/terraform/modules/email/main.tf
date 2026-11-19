@@ -6,6 +6,11 @@
 # hosted zone is in Route 53 in this account, otherwise add them by hand from
 # the `dkim_records` output. While the account is in the SES sandbox,
 # recipients must be verified too: SES emails each of them a confirmation link.
+#
+# SES identities belong to the AWS account, not to one environment. A second
+# environment in the same account (prod next to dev) sets
+# manage_identities = false and reuses the identities the first one created;
+# the plan then fails unless they exist and are verified for sending.
 
 terraform {
   required_providers {
@@ -22,22 +27,39 @@ locals {
 }
 
 resource "aws_sesv2_email_identity" "this" {
-  for_each       = local.identities
+  for_each       = var.manage_identities ? local.identities : toset([])
   email_identity = each.value
+}
+
+# Reused identities (manage_identities = false): they must already be there and verified.
+data "aws_sesv2_email_identity" "existing" {
+  for_each       = var.manage_identities ? toset([]) : local.identities
+  email_identity = each.value
+
+  lifecycle {
+    postcondition {
+      condition     = self.verified_for_sending_status
+      error_message = "The SES identity ${each.value} isn't verified for sending yet. Verify it (in the environment that manages it) before this one uses it."
+    }
+  }
 }
 
 # The DKIM tokens are read back through the data source: it exposes them as a
 # plain attribute (the resource keeps them in a nested block).
 data "aws_sesv2_email_identity" "sender_domain" {
   count          = var.sender_domain != "" ? 1 : 0
-  email_identity = aws_sesv2_email_identity.this[var.sender_domain].email_identity
+  email_identity = var.manage_identities ? aws_sesv2_email_identity.this[var.sender_domain].email_identity : var.sender_domain
 }
 
 locals {
   dkim_tokens = var.sender_domain != "" ? data.aws_sesv2_email_identity.sender_domain[0].dkim_signing_attributes[0].tokens : []
   # Easy DKIM always issues exactly three tokens. Counting them up front keeps
   # the plan known before the identity exists (for_each over them could not).
-  dkim_record_count = var.sender_domain != "" && var.manage_dns_records ? 3 : 0
+  # Only the environment that manages the identities writes their records.
+  dkim_record_count = var.sender_domain != "" && var.manage_dns_records && var.manage_identities ? 3 : 0
+  identity_arns = var.manage_identities ? [for identity in aws_sesv2_email_identity.this : identity.arn] : [
+    for identity in data.aws_sesv2_email_identity.existing : identity.arn
+  ]
 }
 
 data "aws_route53_zone" "sender" {

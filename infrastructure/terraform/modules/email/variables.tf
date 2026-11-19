@@ -15,6 +15,12 @@ variable "sender_domain" {
   default     = ""
 }
 
+variable "manage_identities" {
+  description = "Create the SES identities here (true), or reuse the verified ones another environment in this account created (false)."
+  type        = bool
+  default     = true
+}
+
 variable "manage_dns_records" {
   description = "Write the DKIM records into the sender domain's public Route 53 hosted zone (it must be in this AWS account)."
   type        = bool

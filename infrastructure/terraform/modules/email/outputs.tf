@@ -1,6 +1,6 @@
 output "identity_arns" {
   description = "Identities the mailer may send as (and to, in the sandbox)."
-  value       = [for identity in aws_sesv2_email_identity.this : identity.arn]
+  value       = local.identity_arns
 }
 
 output "dkim_records" {
