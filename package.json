@@ -28,6 +28,8 @@
     "aws:smoke": "node scripts/aws/smoke-test.mjs",
     "aws:preflight": "node scripts/aws/preflight.mjs",
     "aws:export": "node scripts/aws/export.mjs",
+    "aws:backup": "node scripts/aws/backup.mjs",
+    "aws:teardown-check": "node scripts/aws/teardown-check.mjs",
     "rehearse": "node scripts/rehearse.mjs",
     "test:scripts": "node --test \"scripts/**/*.test.mjs\""
   }
