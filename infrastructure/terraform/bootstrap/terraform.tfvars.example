@@ -1,0 +1,3 @@
+# Copy to terraform.tfvars (not committed) and adjust.
+region            = "eu-central-1"
+state_bucket_name = "olu-tfstate-123456789012" # use your AWS account id for uniqueness
