@@ -31,4 +31,18 @@ describe('configuration', () => {
     const gmail = loadConfig({ ...deployed, EMAIL_TRANSPORT: 'gmail', GMAIL_APP_PASSWORD_PARAMETER: '/olu/dev/gmail-app-password' });
     expect(gmail).toMatchObject({ emailTransport: 'gmail', gmailAppPasswordParameter: '/olu/dev/gmail-app-password' });
   });
+
+  it('runs a live reveal only in prod, and prod is live unless told otherwise', () => {
+    const deployed = {
+      TABLE_NAME: 'olu-events',
+      SECRETS_TABLE_NAME: 'olu-secrets',
+      KMS_KEY_ARN: 'arn:aws:kms:eu-central-1:123456789012:key/k',
+      MAILER_FUNCTION_NAME: 'olu-mailer',
+    };
+    expect(() => loadConfig({ ...deployed, ENVIRONMENT: 'dev', REVEAL_MODE: 'LIVE' })).toThrow(/Only prod/);
+    expect(() => loadConfig({ REPOSITORY: 'memory', REVEAL_MODE: 'LIVE' })).toThrow(/Only prod/);
+    expect(loadConfig({ ...deployed, ENVIRONMENT: 'dev' }).revealMode).toBe('TEST');
+    expect(loadConfig({ ...deployed, ENVIRONMENT: 'prod' }).revealMode).toBe('LIVE');
+    expect(loadConfig({ ...deployed, ENVIRONMENT: 'prod', REVEAL_MODE: 'TEST' }).revealMode).toBe('TEST');
+  });
 });
