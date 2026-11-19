@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CreateTableCommand, DeleteTableCommand, DynamoDBClient, waitUntilTableExists } from '@aws-sdk/client-dynamodb';
 import {
   applyAdminCommand,
@@ -45,6 +45,9 @@ const targets: Target[] = [
 
 const endpoint = process.env.DYNAMODB_TEST_ENDPOINT;
 if (endpoint) {
+  // Over the internet each step takes tens of milliseconds, and AWS needs
+  // 10 to 30 seconds to create (and delete) a table.
+  vi.setConfig({ testTimeout: 30_000, hookTimeout: 180_000 });
   const tableName = `olu-contract-${Date.now()}`;
   const region = process.env.AWS_REGION ?? 'eu-central-1';
   const raw = new DynamoDBClient({ region, endpoint });
@@ -74,7 +77,15 @@ if (endpoint) {
       return new DynamoEventRepository(createDocumentClient({ region, endpoint }), tableName);
     },
     cleanup: async () => {
-      if (created) await raw.send(new DeleteTableCommand({ TableName: tableName }));
+      if (!created) return;
+      try {
+        // A table that is still being created can't be deleted yet.
+        await waitUntilTableExists({ client: raw, maxWaitTime: 120 }, { TableName: tableName });
+        await raw.send(new DeleteTableCommand({ TableName: tableName }));
+      } catch (error) {
+        console.error(`Could not delete the test table ${tableName}. Delete it in the DynamoDB console.`, error);
+        throw error;
+      }
     },
   });
 }
