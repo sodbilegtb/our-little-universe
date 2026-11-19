@@ -90,9 +90,13 @@ describe('mock event API', () => {
     expect((await api.getTvView()).quiz.stage).toBe('QUESTION_CLOSED');
   });
 
-  it('never stores or exposes a doctor selection', async () => {
-    await api.submitDoctorSelection('demo-test-link', 'GIRL');
-    await api.submitDoctorSelection('demo-test-link', 'GIRL'); // double tap is harmless
+  it('keeps the doctor\'s answer out of every view, and seals it once', async () => {
+    const { url } = await api.createDoctorLink(admin);
+    const token = url.split('#')[1]!;
+    expect(await api.verifyDoctorLink(token)).toEqual({ mode: 'TEST', status: 'READY' });
+    await api.submitDoctorSelection(token, 'GIRL', 'submission-0000001');
+    await api.submitDoctorSelection(token, 'GIRL', 'submission-0000001'); // double tap is harmless
+    await expectCode(api.submitDoctorSelection(token, 'BOY', 'submission-0000002'), 'ALREADY_SUBMITTED');
     const everything = JSON.stringify([
       await api.getAdminView(admin),
       await api.getTvView(),
@@ -101,11 +105,26 @@ describe('mock event API', () => {
     ]);
     expect(everything).not.toMatch(/GIRL|BOY/);
     expect((await api.getAdminView(admin)).doctor.status).toBe('CODE_SENT');
-    await expectCode(api.verifyDoctorLink('demo-test-link'), 'INVALID_LINK');
-  });
+    expect(await api.verifyDoctorLink(token)).toEqual({ mode: 'TEST', status: 'SEALED' });
+    expect(await api.dev!.outbox!(admin)).toHaveLength(1);
+  }, 30_000);
 
-  it('does not unlock the reveal in the preview', async () => {
-    const result = await api.submitRevealCode(admin, 'R7KM-92PX-L4QT');
-    expect(result.accepted).toBe(false);
-  });
+  it('unlocks the reveal with the emailed code, and releases the result only at the reveal moment', async () => {
+    const { code } = await api.simulateDoctor(admin);
+    for (const type of ['START_VOTING', 'CLOSE_VOTING', 'START_QUIZ', 'OPEN_QUESTION'] as const) await command(type);
+    for (let i = 0; i < 10; i += 1) {
+      await command('CLOSE_QUESTION');
+      await command('REVEAL_ANSWER');
+      await command(i < 9 ? 'NEXT_QUESTION' : 'FINISH_QUIZ');
+    }
+    await command('START_MESSAGES');
+    await command('START_REVEAL');
+    expect((await api.submitRevealCode(admin, '2222-2222-2222')).accepted).toBe(false);
+    const accepted = await api.submitRevealCode(admin, code);
+    expect(accepted.accepted).toBe(true);
+    expect(await api.getRevealResult()).toBeNull();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(Date.parse(accepted.revealAt!));
+    expect((await api.getRevealResult())?.result).toMatch(/^(BOY|GIRL)$/);
+  }, 60_000);
 });

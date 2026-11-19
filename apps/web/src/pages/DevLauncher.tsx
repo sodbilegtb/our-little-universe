@@ -3,7 +3,6 @@ import { MonitorPlay, Smartphone, SlidersHorizontal, Stethoscope, UserPlus } fro
 import type { ReactNode } from 'react';
 import { SkyBackdrop } from '@/components/sky/SkyBackdrop';
 import { MoonMark } from '@/components/brand/MoonMark';
-import { MOCK_DOCTOR_TOKEN } from '@/services/api/mock/constants';
 import { riseIn, sceneVariants } from '@/lib/motion';
 
 interface Surface {
@@ -18,7 +17,7 @@ const SURFACES: Surface[] = [
   { href: '/admin', title: 'Host desk', description: 'Run the evening. Any password works in the preview.', icon: <SlidersHorizontal /> },
   { href: '/party', title: 'Guest phone', description: 'What guests see after scanning the QR code.', icon: <Smartphone /> },
   { href: '/party?slot=2', title: 'Second guest', description: 'Another guest in the same browser, for testing.', icon: <UserPlus /> },
-  { href: `/doctor/${MOCK_DOCTOR_TOKEN}`, title: 'Doctor', description: 'The test doctor link. Nothing is stored.', icon: <Stethoscope /> },
+  { href: '/admin', title: 'Doctor', description: 'Create a test doctor link on the host desk (The secret).', icon: <Stethoscope /> },
 ];
 
 /** Local-only start page linking every surface. Production builds redirect "/" to the guest app. */

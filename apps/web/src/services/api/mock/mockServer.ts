@@ -2,6 +2,12 @@ import {
   DomainError,
   applyAdminCommand,
   authenticateGuest,
+  authorizeReveal,
+  isCurrentDoctorLink,
+  issueDoctorLink,
+  recordDoctorSelection,
+  resetSecret,
+  upgradeState,
   castVote,
   createEventState,
   registerGuest,
@@ -20,9 +26,27 @@ import {
   type SimulationContext,
   EXAMPLE_QUESTIONS,
 } from '@olu/event-core';
-import { revealCodeSchema, type DoctorChoice } from '@olu/shared';
+import {
+  revealCodeSchema,
+  type AdminView,
+  type DoctorChoice,
+  type DoctorLinkResult,
+  type DoctorSessionResult,
+  type RevealCodeResult,
+  type RevealResult,
+  type SimulatedDoctorResult,
+} from '@olu/shared';
 import { ApiError, type Audience, type EventApi } from '../EventApi';
-import { MOCK_DOCTOR_TOKEN } from './constants';
+import {
+  clearSecret,
+  loadSecret,
+  randomChoice,
+  randomCode,
+  randomToken,
+  saveSecret,
+  selectionIdFor,
+  testEmail,
+} from './mockSecret';
 
 /*
  * A browser-only stand-in for the future Lambda + DynamoDB backend.
@@ -32,8 +56,10 @@ import { MOCK_DOCTOR_TOKEN } from './constants';
  * identifiers, authentication, latency and change notifications. A
  * BroadcastChannel keeps /tv, /admin and /party in sync across tabs.
  *
- * Deliberately absent: any notion of the baby's actual gender. The doctor
- * endpoint accepts a choice and discards it.
+ * The doctor's answer in the preview is a test answer that you choose
+ * yourself. It's kept in its own storage key (mockSecret.ts), apart from the
+ * event state, and views never read it; only getRevealResult does, from the
+ * reveal moment on, like the server's separate reveal service.
  */
 
 const STORAGE_KEY = 'olu.mock.state.v2';
@@ -67,7 +93,6 @@ const simulation: SimulationContext = {
 function createInitialState(): EventState {
   const state = createEventState({ eventId: 'evt_local_preview', eventName: 'Our Little Universe', questions: EXAMPLE_QUESTIONS });
   seedSimulatedGuests(state, 9, simulation, Date.now() - 60 * 60_000);
-  state.doctor.status = 'LINK_ISSUED';
   return state;
 }
 
@@ -76,7 +101,7 @@ function load(): EventState {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as EventState;
-      if (parsed.schema === 2) return parsed;
+      if (parsed.schema === 2) return upgradeState(parsed);
     }
   } catch {
     // Corrupt or unavailable storage: start fresh.
@@ -172,6 +197,80 @@ export function joinUrl(): string {
   return `${window.location.origin}/party`;
 }
 
+/* ---------- the secret (preview stand-in for the secrets table, KMS and the mailer) ---------- */
+
+const DOCTOR_LINK_MS = 48 * 60 * 60 * 1000;
+const REVEAL_DELAY_MS = 26_000;
+const CODE_REJECTED = 'That code doesn’t unlock the reveal. Check it and try again.';
+
+const invalidLink = () =>
+  new ApiError({ code: 'INVALID_LINK', message: 'This link isn’t valid or has expired. Please ask the parents for a new one.' });
+
+function findLink(token: string) {
+  const link = loadSecret().links[token];
+  if (!link) throw invalidLink();
+  return link;
+}
+
+function issueLink(): { token: string; expiresAt: number } {
+  const token = randomToken();
+  const linkId = `lnk_${randomToken().slice(0, 16)}`;
+  const expiresAt = Date.now() + DOCTOR_LINK_MS;
+  const secret = loadSecret();
+  secret.links[token] = { linkId, expiresAt };
+  saveSecret(secret);
+  write((draft) => issueDoctorLink(draft, { linkId, expiresAt }));
+  return { token, expiresAt };
+}
+
+function sendCode(selectionId: string): void {
+  const secret = loadSecret();
+  const sealed = secret.selections[selectionId];
+  if (!sealed || sealed.status !== 'ACTIVE') return;
+  secret.outbox.push(testEmail(selectionId, sealed.code));
+  saveSecret(secret);
+}
+
+/** Seals a choice once per link; the same submission again is a no-op. Returns the code. */
+function seal(token: string, choice: DoctorChoice, submissionId: string): string {
+  const link = findLink(token);
+  const state = read();
+  const sealedHere = state.doctor.status === 'SUBMITTED' && state.doctor.linkId === link.linkId;
+  if (!sealedHere && !isCurrentDoctorLink(state, link.linkId, Date.now())) throw invalidLink();
+  const selectionId = selectionIdFor(link.linkId);
+  const secret = loadSecret();
+  const existing = secret.selections[selectionId];
+  if (existing && existing.submissionId !== submissionId) {
+    throw new ApiError({ code: 'ALREADY_SUBMITTED', message: 'An answer has already been sealed with this link.' });
+  }
+  if (!existing) {
+    secret.selections[selectionId] = { linkId: link.linkId, submissionId, choice, code: randomCode(), status: 'ACTIVE' };
+    saveSecret(secret);
+  }
+  const outcome = write((draft, now) => recordDoctorSelection(draft, { linkId: link.linkId, selectionId }, now));
+  if (outcome === 'recorded') sendCode(selectionId);
+  return loadSecret().selections[selectionId]!.code;
+}
+
+function retire(selectionId: string | null): void {
+  if (!selectionId) return;
+  const secret = loadSecret();
+  const sealed = secret.selections[selectionId];
+  if (sealed) sealed.status = 'RETIRED';
+  saveSecret(secret);
+}
+
+/** The host desk sees the email delivery like on the server: sent, never what was sent. */
+function adminView(state: EventState): AdminView {
+  const view = toAdminView(state, Date.now(), joinUrl(), 'TEST');
+  const { selectionId } = state.doctor;
+  if (state.doctor.status === 'SUBMITTED' && selectionId && loadSecret().outbox.some((m) => m.selectionId === selectionId)) {
+    view.doctor.status = 'CODE_SENT';
+    view.doctor.email = { status: 'SENT', attempts: 1, sentAt: null };
+  }
+  return view;
+}
+
 /* ---------- the API ---------- */
 
 export const mockEventApi: EventApi = {
@@ -189,7 +288,7 @@ export const mockEventApi: EventApi = {
   getAdminView: (admin) =>
     call('admin', () => {
       requireAdmin(admin.token);
-      return toAdminView(read(), Date.now(), joinUrl());
+      return adminView(read());
     }),
   exportEvent: (admin) =>
     call('admin', () => {
@@ -267,48 +366,101 @@ export const mockEventApi: EventApi = {
   submitRevealCode: (admin, code) =>
     call(
       'admin',
-      () => {
+      (): RevealCodeResult => {
         requireAdmin(admin.token);
-        if (!revealCodeSchema.safeParse(code).success) {
-          return { accepted: false, message: 'Codes have 12 characters, like R7KM-92PX-L4QT.' };
+        const state = read();
+        if (state.phase !== 'REVEAL') return { accepted: false, message: 'Start the reveal first, then enter the code.' };
+        const parsed = revealCodeSchema.safeParse(code);
+        if (!parsed.success) return { accepted: false, message: 'Codes look like R7KM-92PX-L4QT: 12 letters and digits.' };
+        const secret = loadSecret();
+        const entry = Object.entries(secret.selections).find(([, s]) => s.code === parsed.data && s.status === 'ACTIVE');
+        if (!entry) return { accepted: false, message: CODE_REJECTED };
+        try {
+          write((draft, now) => authorizeReveal(draft, { selectionId: entry[0], delayMs: REVEAL_DELAY_MS }, now));
+        } catch (error) {
+          if (error instanceof DomainError && error.code === 'NOT_FOUND') return { accepted: false, message: CODE_REJECTED };
+          throw error;
         }
+        const revealAt = read().reveal.revealAt;
         return {
-          accepted: false,
-          message: 'Reveal codes are verified by the server, which arrives in a later milestone. Nothing was unlocked.',
+          accepted: true,
+          message: 'The code is right. The reveal has begun.',
+          ...(revealAt === null ? {} : { revealAt: new Date(revealAt).toISOString() }),
         };
       },
       [500, 800],
     ),
 
+  createDoctorLink: (admin) =>
+    call('admin', (): DoctorLinkResult => {
+      requireAdmin(admin.token);
+      const { token, expiresAt } = issueLink();
+      return { url: `${window.location.origin}/doctor#${token}`, expiresAt: new Date(expiresAt).toISOString() };
+    }),
+
+  resendRevealCode: (admin) =>
+    call('admin', () => {
+      requireAdmin(admin.token);
+      const { doctor } = read();
+      if (doctor.status !== 'SUBMITTED' || !doctor.selectionId) {
+        throw new ApiError({ code: 'WRONG_PHASE', message: 'There is no sealed answer yet.' });
+      }
+      sendCode(doctor.selectionId);
+    }),
+
+  resetSecret: (admin) =>
+    call('admin', () => {
+      requireAdmin(admin.token);
+      retire(write((draft) => resetSecret(draft)).retiredSelectionId);
+    }),
+
+  simulateDoctor: (admin) =>
+    call(
+      'admin',
+      (): SimulatedDoctorResult => {
+        requireAdmin(admin.token);
+        if (read().doctor.status === 'SUBMITTED') retire(write((draft) => resetSecret(draft)).retiredSelectionId);
+        const { token } = issueLink();
+        return { code: seal(token, randomChoice(), randomToken()) };
+      },
+      [400, 700],
+    ),
+
   verifyDoctorLink: (token) =>
     call(
       'guest',
-      () => {
+      (): DoctorSessionResult => {
+        const link = findLink(token);
         const state = read();
-        if (token !== MOCK_DOCTOR_TOKEN) {
-          throw new ApiError({ code: 'INVALID_LINK', message: 'This link isn’t valid. Please ask the hosts for a new one.' });
-        }
-        if (state.doctor.status === 'SUBMITTED' || state.doctor.status === 'CODE_SENT') {
-          throw new ApiError({ code: 'INVALID_LINK', message: 'This link has already been used. The answer is sealed.' });
-        }
-        return { mode: 'TEST' as const };
+        if (state.doctor.status === 'SUBMITTED' && state.doctor.linkId === link.linkId) return { mode: 'TEST', status: 'SEALED' };
+        if (state.doctor.status !== 'LINK_ISSUED' || !isCurrentDoctorLink(state, link.linkId, Date.now())) throw invalidLink();
+        return { mode: 'TEST', status: 'READY' };
       },
       [300, 500],
     ),
 
-  submitDoctorSelection: (token, choice: DoctorChoice) =>
+  submitDoctorSelection: (token, choice: DoctorChoice, submissionId) =>
     call(
       'guest',
       () => {
         if (choice !== 'BOY' && choice !== 'GIRL') throw new ApiError({ code: 'INVALID_INPUT', message: 'Choose one option.' });
-        if (token !== MOCK_DOCTOR_TOKEN) throw new ApiError({ code: 'INVALID_LINK', message: 'This link isn’t valid.' });
-        // The mock never stores the selection. It only records that a submission happened.
-        if (read().doctor.status === 'CODE_SENT') return; // idempotent
-        write((state) => {
-          state.doctor.status = 'CODE_SENT';
-        });
+        seal(token, choice, submissionId);
       },
       [900, 1300],
+    ),
+
+  getRevealResult: () =>
+    call(
+      'tv',
+      (): RevealResult | null => {
+        const { phase, reveal, doctor } = read();
+        if (phase !== 'REVEAL' || reveal.revealAt === null || Date.now() < reveal.revealAt) return null;
+        if ((reveal.status !== 'REVEALING' && reveal.status !== 'REVEALED') || !doctor.selectionId) return null;
+        const sealed = loadSecret().selections[doctor.selectionId];
+        if (!sealed || sealed.status !== 'ACTIVE') return null;
+        return { result: sealed.choice, revealAt: new Date(reveal.revealAt).toISOString() };
+      },
+      [40, 120],
     ),
 };
 
@@ -316,6 +468,7 @@ export const mockEventApi: EventApi = {
 
 export const mockTools = {
   reset(): void {
+    clearSecret();
     const fresh = createInitialState();
     fresh.revision = load().revision + 1;
     localStorage.removeItem(OUTAGE_KEY);
@@ -343,4 +496,8 @@ mockEventApi.dev = {
   simulateActivity: async () => mockTools.simulateActivity(),
   simulateOutage: (ms) => mockTools.simulateOutage(ms),
   outageEndsAt: () => mockTools.outageEndsAt(),
+  outbox: async (admin) => {
+    requireAdmin(admin.token);
+    return loadSecret().outbox.map(({ subject, text }) => ({ subject, text }));
+  },
 };
