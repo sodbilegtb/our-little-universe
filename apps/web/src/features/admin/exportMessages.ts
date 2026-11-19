@@ -1,7 +1,9 @@
 import type { AdminMessage } from '@olu/shared';
 
 function csvCell(value: string | number | boolean): string {
-  const text = String(value);
+  let text = String(value);
+  // A leading =, +, - or @ would make Excel run a guest's name or message as a formula.
+  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
