@@ -24,6 +24,7 @@ const { values: args } = parseArgs({
     poll: { type: 'string', default: '1500' },
     reset: { type: 'boolean', default: false },
     fresh: { type: 'boolean', default: false },
+    hold: { type: 'string', default: '0' },
     help: { type: 'boolean', short: 'h', default: false },
   },
 });
@@ -31,9 +32,10 @@ const { values: args } = parseArgs({
 if (args.help || (!args.api && !args.env)) {
   console.log(`Usage:
   ADMIN_PASSWORD=... npm run rehearse -- --api <url> [--guests 30] [--poll 1500] [--reset]
-  ADMIN_PASSWORD=... npm run rehearse -- --env dev [--guests 30] [--fresh]
+  ADMIN_PASSWORD=... npm run rehearse -- --env dev [--guests 30] [--fresh] [--hold 20]
 
   --fresh   start a new rehearsal run first (test mode; like the host desk button)
+  --hold    seconds to stay on the celebration before finishing, to watch it on the TV
   --reset   start over first (local API only: uses the development reset route)`);
   process.exit(args.help ? 0 : 1);
 }
@@ -462,6 +464,11 @@ async function main() {
     const after = await call('view', 'GET', '/v1/reveal/result');
     // The rehearsal never prints the (simulated) answer, only that it was released.
     check(after.status === 200 && /^(BOY|GIRL)$/.test(after.body?.result ?? ''), 'the reveal service releases the result at the reveal moment');
+  }
+  const hold = Math.max(0, Math.min(600, Number.parseInt(args.hold, 10) || 0));
+  if (hold > 0) {
+    console.log(`  … holding the celebration on the TV for ${hold} s`);
+    await sleep(hold * 1000);
   }
   await host('FINISH_EVENT');
   mark('finished', (v) => v.phase === 'FINISHED');
