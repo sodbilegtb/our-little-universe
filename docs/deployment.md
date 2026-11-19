@@ -78,9 +78,32 @@ npm run aws:set-password -- dev
 
 The script asks twice (hidden input), hashes with scrypt on your laptop, and stores only the hash as a SecureString. A running API picks up a changed password within 5 minutes. Until the parameter exists, guests can play but host sign-in answers "Host sign-in isn't configured on the server."
 
-## 4b. Reveal code email (Amazon SES)
+## 4b. Reveal code email
 
-The mailer sends the reveal code through SES. Without an email configuration, dev still works: the host desk shows the email as skipped, and "Simulate the doctor (test)" shows the test code directly.
+The mailer sends the reveal code to the parents. Without an email configuration, dev still works: the host desk shows the email as skipped, and "Simulate the doctor (test)" shows the test code directly.
+
+There are two ways to send it. Gmail is the quicker one to set up; SES is the default.
+
+### Option A: a Gmail account (simplest)
+
+A Gmail account sends the code with an app password over SMTP. No domain, no DNS, no SES sandbox, and Gmail to Gmail lands in the inbox. Use an account that only sends: an app password can read and send that account's mail. Gmail allows about 500 emails a day; the app sends one or two.
+
+1. In the sending account, turn on [2-Step Verification](https://myaccount.google.com/signinoptions/twosv), then create an app password at [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords).
+2. Store it (asked hidden, saved as an SSM SecureString that only the mailer may read; it never reaches Terraform or Git):
+   ```bash
+   npm run aws:set-gmail-password -- dev
+   ```
+3. In `environments/dev/terraform.tfvars` set:
+   ```hcl
+   email_transport  = "gmail"
+   email_sender     = "sender@gmail.com"   # the account with the app password
+   email_recipients = ["you@gmail.com"]
+   ```
+4. Plan and apply (step 3). A new app password applies to the next email, no apply needed.
+
+If the host desk shows the email as failed, the mailer log has the reason (`aws logs tail /aws/lambda/olu-dev-mailer --since 30m`): `SmtpEAUTH` means Gmail refused the sign-in (wrong app password, or `email_sender` isn't the account it belongs to), `GmailAppPasswordInvalid` means the stored value isn't a 16-letter app password, `ParameterNotFound` means step 2 is missing.
+
+### Option B: Amazon SES
 
 1. In `environments/dev/terraform.tfvars` set:
    ```hcl
@@ -93,7 +116,7 @@ The mailer sends the reveal code through SES. Without an email configuration, de
    - **DNS in Route 53 in the same AWS account** (`dig +short NS your-domain.example` shows `awsdns` servers): set `email_dns_in_route53 = true` and Terraform writes the records itself.
    - **DNS anywhere else:** run `terraform output email_dkim_records` and add the three records at your DNS provider. Most providers append the domain, so enter only the part before it (`xxxx._domainkey`). On Cloudflare, use "DNS only".
 
-   SES then checks the records on its own, usually within 30 minutes. `aws sesv2 get-email-identity --email-identity your-domain.example --query VerifiedForSendingStatus` turns `true` when it's done.
+   SES then checks the records on its own, usually within an hour, rarely up to 72 hours. `aws sesv2 get-email-identity --email-identity your-domain.example --query VerifiedForSendingStatus` turns `true` when it's done.
 4. New AWS accounts start in the **SES sandbox**. Only verified addresses can receive mail, and the limit is 200 emails a day. That's enough for this app, so you don't need production access.
 
 Test-mode emails have the subject `[TEST] OFFICIAL BABY REVEAL CODE` and say they can't unlock the real reveal. How the secret is protected is described in [`security.md`](security.md).

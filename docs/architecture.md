@@ -73,7 +73,7 @@ The dev environment runs the same `services/api` bundle as one Lambda behind an 
 
 ```
 doctor ──► API Lambda ──seal (KMS Encrypt only)──► secrets table
-              │  └─ invoke (ids only) ──► mailer Lambda ──open code──► SES ──► parents
+              │  └─ invoke (ids only) ──► mailer Lambda ──open code──► SES or Gmail ──► parents
 host ──code──► API Lambda: hash, match, start reveal (revealAt)
 TV ──GET /v1/reveal/result──► reveal Lambda ──open answer, from revealAt on──► { result }
 ```

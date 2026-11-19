@@ -9,7 +9,7 @@ The most important rule of the project: the baby's gender stays hidden until the
    - The doctor's device sends a submission id, generated once per confirmation. Double clicks, retries and refreshes are the same submission, so a second code is never created.
    - A different submission with the same link is refused.
    - Opening or refreshing the doctor page is read-only.
-3. **Code email.** The API asks the mailer Lambda (asynchronously, ids only) to send the code. The mailer opens the code, never the answer, and sends it through SES. A failed send is retried twice by Lambda, and "Send the code again" on the host desk repeats the same code. The email contains the code and nothing else about the secret.
+3. **Code email.** The API asks the mailer Lambda (asynchronously, ids only) to send the code. The mailer opens the code, never the answer, and sends it through SES or a Gmail account (`email_transport`). The Gmail app password is an SSM SecureString that only the mailer role may read; it never passes through Terraform, Git or the logs. A failed send is retried twice by Lambda, and "Send the code again" on the host desk repeats the same code. The email contains the code and nothing else about the secret.
 4. **Reveal.** In the reveal phase the host enters the code. The API hashes it with the environment and event, looks it up, and checks that it belongs to the answer sealed for this event right now and hasn't been retired. If so, the reveal starts with `revealAt = now + 26 s` on the server clock (`reveal_delay_seconds`). Wrong, malformed, retired and foreign codes all get the same answer, and attempts are limited to 10 per 15 minutes per event.
 5. **Result.** `GET /v1/reveal/result` is served by the separate reveal Lambda. It answers a neutral 409 until `revealAt`, whatever the reason, and only then opens the answer. Clients never receive the result before that moment, not even hidden.
 
@@ -64,4 +64,5 @@ It isn't implemented, because the spec asks to avoid unnecessary cryptographic c
 
 - KMS: a customer managed key costs 1 USD per month (billed hourly). Requests cost 0.03 USD per 10,000, after 20,000 free requests per month, and a party uses a few dozen. A key scheduled for deletion costs nothing; `terraform destroy` schedules it with a 7-day window, during which it can be restored. ([KMS pricing](https://aws.amazon.com/kms/pricing/))
 - SES: 0.10 USD per 1,000 emails. ([SES pricing](https://aws.amazon.com/ses/pricing/))
+- Gmail: free (about 500 emails a day per account).
 - The secrets table and the two Lambdas cost fractions of a cent per evening.

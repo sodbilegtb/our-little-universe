@@ -118,7 +118,7 @@ docs/                      Architecture, API, data model, deployment, design sys
 - The DynamoDB contract tests pass against real DynamoDB, and the rehearsal (`npm run rehearse`) passes with 40 simulated phones.
 
 **Built and tested, not yet deployed to AWS**
-- The secret: one-time doctor link, KMS-sealed answer and code, code email via SES, verified reveal code, result released only at the reveal moment by a separate Lambda. See [`docs/security.md`](docs/security.md).
+- The secret: one-time doctor link, KMS-sealed answer and code, code email via SES or Gmail, verified reveal code, result released only at the reveal moment by a separate Lambda. See [`docs/security.md`](docs/security.md).
 
 **Still mock**
 - The browser-only preview (`services/api/mock`), including a test-mode stand-in for the secret.
