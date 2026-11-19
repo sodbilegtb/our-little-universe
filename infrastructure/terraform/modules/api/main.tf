@@ -87,9 +87,16 @@ resource "aws_apigatewayv2_integration" "lambda" {
   timeout_milliseconds   = 10000
 }
 
-resource "aws_apigatewayv2_route" "default" {
+# Explicit GET and POST routes rather than a catch-all $default route: with
+# $default, the browser's CORS preflight (OPTIONS) is sent to the Lambda
+# instead of being answered by API Gateway, and every cross-origin POST fails.
+# With no route for OPTIONS, API Gateway answers preflights from the CORS
+# configuration above.
+resource "aws_apigatewayv2_route" "proxy" {
+  for_each = toset(["GET /{proxy+}", "POST /{proxy+}"])
+
   api_id    = aws_apigatewayv2_api.http.id
-  route_key = "$default"
+  route_key = each.value
   target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
 }
 

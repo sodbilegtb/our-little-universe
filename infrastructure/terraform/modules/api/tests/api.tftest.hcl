@@ -113,6 +113,11 @@ run "api_gateway" {
   }
 
   assert {
+    condition     = keys(aws_apigatewayv2_route.proxy) == ["GET /{proxy+}", "POST /{proxy+}"]
+    error_message = "Only GET and POST reach the Lambda; API Gateway must answer CORS preflights (OPTIONS) itself. A $default route would swallow them."
+  }
+
+  assert {
     condition     = aws_apigatewayv2_integration.lambda.payload_format_version == "2.0"
     error_message = "The handler expects payload format 2.0."
   }
