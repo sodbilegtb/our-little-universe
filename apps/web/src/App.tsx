@@ -16,7 +16,7 @@ export function App() {
         <Route path="/party" element={<PartyPage />} />
         <Route path="/tv" element={<TvPage />} />
         <Route path="/admin" element={<AdminPage />} />
-        <Route path="/doctor/:token" element={<DoctorPage />} />
+        <Route path="/doctor" element={<DoctorPage />} />
         <Route path="/doctor" element={<DoctorPage />} />
         <Route path="*" element={<Navigate to="/party" replace />} />
       </Routes>

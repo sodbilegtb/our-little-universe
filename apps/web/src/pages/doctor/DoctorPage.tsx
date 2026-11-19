@@ -1,10 +1,30 @@
-import { useEffect } from 'react';
-import { useParams } from 'react-router';
+import { useEffect, useState } from 'react';
 import { DoctorFlow } from '@/features/doctor/DoctorFlow';
+
+const TOKEN_KEY = 'olu.doctor.token';
+
+/**
+ * The token arrives in the URL fragment (/doctor#…), which browsers never send
+ * to a server. It's moved into this tab's session storage and removed from the
+ * address bar, so it doesn't linger in history or on screen.
+ */
+function takeToken(): string {
+  const fromLink = window.location.hash.slice(1);
+  try {
+    if (fromLink) {
+      sessionStorage.setItem(TOKEN_KEY, fromLink);
+      window.history.replaceState(null, '', window.location.pathname);
+      return fromLink;
+    }
+    return sessionStorage.getItem(TOKEN_KEY) ?? '';
+  } catch {
+    return fromLink;
+  }
+}
 
 /** The doctor's surface is deliberately light: ivory paper, like a sealed letter. */
 export function DoctorPage() {
-  const { token = '' } = useParams();
+  const [token] = useState(takeToken);
 
   useEffect(() => {
     const meta = document.querySelector('meta[name="theme-color"]');

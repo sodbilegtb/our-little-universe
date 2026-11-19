@@ -1,4 +1,4 @@
-import type { ApiErrorBody, GuestSession } from '@olu/shared';
+import type { ApiErrorBody, GuestSession, RevealResult } from '@olu/shared';
 import { ApiError, type AdminSession, type EventApi } from '../EventApi';
 
 /*
@@ -79,17 +79,32 @@ export function createHttpEventApi(baseUrl: string): EventApi {
     sendAdminCommand: (admin, command) => request('POST', '/v1/admin/commands', { body: command, auth: adminAuth(admin) }),
     submitRevealCode: (admin, code) => request('POST', '/v1/admin/reveal-code', { body: { code }, auth: adminAuth(admin) }),
 
-    verifyDoctorLink: async () => {
-      throw new ApiError({ code: 'INVALID_LINK', message: 'Doctor mode arrives in a later milestone.' });
+    createDoctorLink: (admin) => request('POST', '/v1/admin/doctor/link', { auth: adminAuth(admin) }),
+    resendRevealCode: (admin) => request('POST', '/v1/admin/doctor/resend', { auth: adminAuth(admin) }),
+    resetSecret: (admin) => request('POST', '/v1/admin/doctor/reset', { body: { confirm: 'RESET' }, auth: adminAuth(admin) }),
+    simulateDoctor: (admin) => request('POST', '/v1/admin/doctor/simulate', { auth: adminAuth(admin) }),
+
+    // The token goes in the body, never in a URL (URLs end up in access logs).
+    verifyDoctorLink: (token) => request('POST', '/v1/doctor/session', { body: { token } }),
+    submitDoctorSelection: async (token, choice, submissionId) => {
+      await request('POST', '/v1/doctor/selection', { body: { token, choice, submissionId, confirmed: true }, timeoutMs: 15_000 });
     },
-    submitDoctorSelection: async () => {
-      throw new ApiError({ code: 'NOT_AVAILABLE', message: 'Doctor mode arrives in a later milestone.' });
+
+    // Served by the separate reveal service. 409 means "still sealed", for whatever reason.
+    getRevealResult: async () => {
+      try {
+        return await request<RevealResult>('GET', '/v1/reveal/result', { timeoutMs: 5000 });
+      } catch (error) {
+        if (error instanceof ApiError && error.code === 'WRONG_PHASE') return null;
+        throw error;
+      }
     },
 
     dev: import.meta.env.DEV
       ? {
           reset: (admin) => request('POST', '/v1/dev/reset?seedGuests=9', { auth: adminAuth(admin) }),
           simulateActivity: (admin) => request('POST', '/v1/dev/simulate', { auth: adminAuth(admin) }),
+          outbox: (admin) => request('GET', '/v1/dev/outbox', { auth: adminAuth(admin) }),
         }
       : undefined,
   };

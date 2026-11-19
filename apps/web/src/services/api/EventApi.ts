@@ -5,11 +5,16 @@ import type {
   BabyMessageInput,
   CastVoteInput,
   DoctorChoice,
+  DoctorLinkResult,
+  DoctorSessionResult,
   EventExport,
   GuestSession,
   GuestView,
   QuizAnswerInput,
   RegisterGuestInput,
+  RevealCodeResult,
+  RevealResult,
+  SimulatedDoctorResult,
   TvView,
 } from '@olu/shared';
 
@@ -53,11 +58,22 @@ export interface EventApi {
   /** Host actions. Every call carries the admin session. */
   adminSignIn(password: string): Promise<AdminSession>;
   sendAdminCommand(admin: AdminSession, command: AdminCommand): Promise<void>;
-  submitRevealCode(admin: AdminSession, code: string): Promise<{ accepted: boolean; message: string }>;
+  submitRevealCode(admin: AdminSession, code: string): Promise<RevealCodeResult>;
+  /** The one valid doctor link; a new one retires the previous one. The URL is shown once. */
+  createDoctorLink(admin: AdminSession): Promise<DoctorLinkResult>;
+  /** Emails the same code again (never a new one). */
+  resendRevealCode(admin: AdminSession): Promise<void>;
+  /** Throws away the sealed answer and its code, before the reveal has begun. */
+  resetSecret(admin: AdminSession): Promise<void>;
+  /** TEST mode only: a random doctor answer, so a rehearsal can run end to end. */
+  simulateDoctor(admin: AdminSession): Promise<SimulatedDoctorResult>;
 
   /** Doctor actions. The selection travels one way only and is never read back. */
-  verifyDoctorLink(token: string): Promise<{ mode: 'TEST' | 'LIVE' }>;
-  submitDoctorSelection(token: string, choice: DoctorChoice): Promise<void>;
+  verifyDoctorLink(token: string): Promise<DoctorSessionResult>;
+  submitDoctorSelection(token: string, choice: DoctorChoice, submissionId: string): Promise<void>;
+
+  /** The result, from the reveal moment on; null until then, whatever the reason. */
+  getRevealResult(): Promise<RevealResult | null>;
 
   /** Local development aids. Absent against a deployed API. */
   dev?: DevTools;
@@ -68,6 +84,8 @@ export interface DevTools {
   reset(admin: AdminSession): Promise<void>;
   /** Votes, answers or messages from placeholder guests, through the real rules. */
   simulateActivity(admin: AdminSession): Promise<void>;
+  /** Test emails the local server or the preview "sent" (newest last). */
+  outbox?(admin: AdminSession): Promise<{ subject: string; text: string }[]>;
   /** Mock only: cuts phones and the TV off for a while. */
   simulateOutage?(ms: number): void;
   outageEndsAt?(): number | null;

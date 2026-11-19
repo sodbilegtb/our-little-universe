@@ -13,7 +13,8 @@ import { NowPanel } from '@/features/admin/NowPanel';
 import { PhaseTimeline } from '@/features/admin/PhaseTimeline';
 import { GuestsPanel, MessagesPanel, QuizPanel, RevealPanel, VotingPanel } from '@/features/admin/DetailPanels';
 import { QuizEditor } from '@/features/admin/QuizEditor';
-import { KeepsakeCard, PreviewToolsCard, SecretCard, ShareCard } from '@/features/admin/SideCards';
+import { KeepsakeCard, PreviewToolsCard, ShareCard } from '@/features/admin/SideCards';
+import { SecretCard } from '@/features/admin/SecretCard';
 import { AdminSessionProvider, adminSessionStore } from '@/features/admin/adminSession';
 import { useLiveView } from '@/hooks/useLiveView';
 import { ApiError, api, isMockApi, type AdminSession } from '@/services/api';
@@ -64,6 +65,7 @@ function AdminDashboard({ session, onSignOut }: { session: AdminSession; onSignO
           <span className="text-mist">Host desk</span>
           {isMockApi && <Pill tone="lavender">Local preview with mock data</Pill>}
           {!isMockApi && import.meta.env.DEV && <Pill tone="lavender">Local server</Pill>}
+          {!isMockApi && !import.meta.env.DEV && view.mode === 'TEST' && <Pill tone="lavender">Test mode</Pill>}
         </div>
         <div className="flex items-center gap-3">
           <ConnectionNotice status={status} variant="admin" />
@@ -78,7 +80,7 @@ function AdminDashboard({ session, onSignOut }: { session: AdminSession; onSignO
           <section className="rounded-[1.5rem] border border-ivory/[0.08] bg-night-deep/40 p-3">
             <PhaseTimeline phase={view.phase} />
           </section>
-          <SecretCard view={view} />
+          <SecretCard view={view} onChanged={refresh} />
           <ShareCard view={view} />
           <KeepsakeCard />
           <PreviewToolsCard onChanged={refresh} />
@@ -140,7 +142,7 @@ function PhaseDetail({ view, onChanged }: { view: AdminView; onChanged: () => vo
     case 'REVEAL':
       return (
         <>
-          <RevealPanel />
+          <RevealPanel view={view} onChanged={onChanged} />
           <MessagesPanel view={view} onChanged={onChanged} />
         </>
       );

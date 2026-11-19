@@ -11,6 +11,8 @@ interface ConfirmDialogProps {
   cancelLabel?: string;
   tone?: 'primary' | 'danger';
   busy?: boolean;
+  /** For confirmations that need something typed first. */
+  confirmDisabled?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -24,6 +26,7 @@ export function ConfirmDialog({
   cancelLabel = 'Cancel',
   tone = 'primary',
   busy,
+  confirmDisabled,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -78,6 +81,7 @@ export function ConfirmDialog({
                 ref={confirmRef}
                 variant={tone === 'danger' ? 'danger' : 'primary'}
                 loading={busy}
+                disabled={confirmDisabled}
                 onClick={onConfirm}
               >
                 {confirmLabel}

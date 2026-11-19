@@ -1,30 +1,15 @@
 import { useState } from 'react';
 import { useEffect } from 'react';
-import { Archive, Copy, Download, ExternalLink, RotateCcw, Sparkles, WifiOff } from 'lucide-react';
-import type { AdminView, DoctorStatus, RevealStatus } from '@olu/shared';
+import { Archive, Copy, Download, ExternalLink, Mail, RotateCcw, Sparkles, WifiOff } from 'lucide-react';
+import type { AdminView } from '@olu/shared';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/Dialog';
 import { Pill } from '@/components/ui/Pill';
 import { api, ApiError, isMockApi } from '@/services/api';
-import { MOCK_DOCTOR_TOKEN } from '@/services/api/mock/constants';
 import { useAdminSession } from './adminSession';
 import { exportFiles, type ExportFile } from './exportEvent';
 import { downloadFile } from './exportMessages';
 import { Panel } from './Panel';
-
-const DOCTOR_TEXT: Record<DoctorStatus, { label: string; tone: 'neutral' | 'champagne' | 'sage' }> = {
-  NOT_STARTED: { label: 'No link yet', tone: 'neutral' },
-  LINK_ISSUED: { label: 'Waiting for the doctor', tone: 'champagne' },
-  SUBMITTED: { label: 'Answer sealed', tone: 'sage' },
-  CODE_SENT: { label: 'Sealed, code emailed', tone: 'sage' },
-};
-
-const REVEAL_TEXT: Record<RevealStatus, string> = {
-  LOCKED: 'Locked',
-  AWAITING_CODE: 'Waiting for the code',
-  REVEALING: 'Revealing',
-  REVEALED: 'Revealed',
-};
 
 function useCopy() {
   const [copied, setCopied] = useState<string | null>(null);
@@ -38,41 +23,6 @@ function useCopy() {
     }
   };
   return { copied, copy };
-}
-
-export function SecretCard({ view }: { view: AdminView }) {
-  const doctor = DOCTOR_TEXT[view.doctor.status];
-  const { copied, copy } = useCopy();
-  const doctorUrl = `${window.location.origin}/doctor/${MOCK_DOCTOR_TOKEN}`;
-  return (
-    <Panel title="The secret">
-      <dl className="grid gap-4 text-[0.95rem]">
-        <div className="flex items-center justify-between gap-3">
-          <dt className="text-mist">Doctor</dt>
-          <dd>
-            <Pill tone={doctor.tone}>{doctor.label}</Pill>
-          </dd>
-        </div>
-        <div className="flex items-center justify-between gap-3">
-          <dt className="text-mist">Reveal</dt>
-          <dd className="text-ivory-dim">{REVEAL_TEXT[view.reveal.status]}</dd>
-        </div>
-      </dl>
-      <p className="mt-5 text-sm leading-relaxed text-mist">
-        The answer is never shown here. Only the official code unlocks it, on the TV.
-      </p>
-      {isMockApi && view.doctor.status === 'LINK_ISSUED' && (
-        <Button
-          variant="quiet"
-          size="sm" block className="mt-4"
-          icon={<Copy className="h-4 w-4" aria-hidden />}
-          onClick={() => copy('doctor', doctorUrl)}
-        >
-          {copied === 'doctor' ? 'Copied' : 'Copy test doctor link'}
-        </Button>
-      )}
-    </Panel>
-  );
 }
 
 export function ShareCard({ view }: { view: AdminView }) {
@@ -190,6 +140,7 @@ export function PreviewToolsCard({ onChanged }: { onChanged: () => void }) {
   const [confirmReset, setConfirmReset] = useState(false);
   const [busy, setBusy] = useState(false);
   const [outageLeft, setOutageLeft] = useState<number | null>(null);
+  const [lastEmail, setLastEmail] = useState<{ subject: string; text: string } | null | 'none'>(null);
 
   useEffect(() => {
     if (!dev?.outageEndsAt) return;
@@ -239,6 +190,20 @@ export function PreviewToolsCard({ onChanged }: { onChanged: () => void }) {
             {outageLeft !== null ? `Phones and TV offline for ${outageLeft}s` : 'Simulate connection drop'}
           </Button>
         )}
+        {dev.outbox && (
+          <Button
+            variant="quiet"
+            size="sm"
+            align="start"
+            icon={<Mail className="h-4 w-4" aria-hidden />}
+            onClick={async () => {
+              const outbox = await dev.outbox!(admin);
+              setLastEmail(outbox.at(-1) ?? 'none');
+            }}
+          >
+            Show the last test email
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="sm"
@@ -249,6 +214,13 @@ export function PreviewToolsCard({ onChanged }: { onChanged: () => void }) {
           Reset the preview
         </Button>
       </div>
+      {lastEmail === 'none' && <p className="mt-3 text-sm text-mist">No test email yet.</p>}
+      {lastEmail && lastEmail !== 'none' && (
+        <div className="mt-3 rounded-xl border border-ivory/10 bg-night/50 p-3" data-testid="test-email">
+          <p className="text-sm font-medium text-ivory">{lastEmail.subject}</p>
+          <pre className="mt-2 whitespace-pre-wrap font-mono text-xs text-ivory-dim">{lastEmail.text}</pre>
+        </div>
+      )}
       <ConfirmDialog
         open={confirmReset}
         tone="danger"

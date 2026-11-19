@@ -4,7 +4,7 @@ import { ArrowLeft, ShieldCheck } from 'lucide-react';
 import type { DoctorChoice } from '@olu/shared';
 import { Button } from '@/components/ui/Button';
 import { MoonMark } from '@/components/brand/MoonMark';
-import { api, errorMessage } from '@/services/api';
+import { api, ApiError, errorMessage } from '@/services/api';
 import { cn } from '@/lib/cn';
 import { ease } from '@/lib/motion';
 import { WaxSeal } from './WaxSeal';
@@ -15,7 +15,7 @@ type Step =
   | { name: 'choose' }
   | { name: 'confirm' }
   | { name: 'sealing' }
-  | { name: 'sealed' };
+  | { name: 'sealed'; already?: boolean };
 
 const OPTIONS: { choice: DoctorChoice; label: string }[] = [
   { choice: 'BOY', label: 'Boy' },
@@ -38,15 +38,21 @@ export function DoctorFlow({ token }: { token: string }) {
   const [mode, setMode] = useState<'TEST' | 'LIVE' | null>(null);
   const [choice, setChoice] = useState<DoctorChoice | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** One id per confirmation: retrying the same confirmation can never seal a second answer. */
+  const [submissionId, setSubmissionId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
+    if (!token) {
+      setStep({ name: 'invalid', message: 'This page needs the link the parents sent you.' });
+      return;
+    }
     api
       .verifyDoctorLink(token)
       .then((result) => {
         if (!active) return;
         setMode(result.mode);
-        setStep({ name: 'choose' });
+        setStep(result.status === 'SEALED' ? { name: 'sealed', already: true } : { name: 'choose' });
       })
       .catch((reason: unknown) => {
         if (active) setStep({ name: 'invalid', message: errorMessage(reason, 'This link isn’t valid.') });
@@ -57,17 +63,28 @@ export function DoctorFlow({ token }: { token: string }) {
   }, [token]);
 
   const seal = async () => {
-    if (!choice || step.name === 'sealing') return;
+    if (!choice || !submissionId || step.name === 'sealing') return;
     setStep({ name: 'sealing' });
     setError(null);
     try {
-      await api.submitDoctorSelection(token, choice);
+      await api.submitDoctorSelection(token, choice, submissionId);
       setChoice(null); // forget it as soon as the server has it
       setStep({ name: 'sealed' });
     } catch (reason) {
+      if (reason instanceof ApiError && reason.code === 'ALREADY_SUBMITTED') {
+        setChoice(null);
+        setStep({ name: 'sealed', already: true });
+        return;
+      }
       setError(errorMessage(reason));
       setStep({ name: 'confirm' });
     }
+  };
+
+  const confirmChoice = () => {
+    setSubmissionId(crypto.randomUUID());
+    setError(null);
+    setStep({ name: 'confirm' });
   };
 
   const chosenLabel = OPTIONS.find((o) => o.choice === choice)?.label;
@@ -140,7 +157,7 @@ export function DoctorFlow({ token }: { token: string }) {
                 })}
               </div>
             </div>
-            <Button variant="ink" size="lg" block disabled={!choice} onClick={() => setStep({ name: 'confirm' })}>
+            <Button variant="ink" size="lg" block disabled={!choice} onClick={confirmChoice}>
               Continue
             </Button>
           </motion.div>
@@ -187,9 +204,13 @@ export function DoctorFlow({ token }: { token: string }) {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0, transition: { delay: 0.6, duration: 0.7, ease: ease.drift } }}
             >
-              <h1 className="type-display mt-10 text-[2.6rem] text-ink">Sealed. Thank you.</h1>
+              <h1 className="type-display mt-10 text-[2.6rem] text-ink">
+                {step.already ? 'Already sealed' : 'Sealed. Thank you.'}
+              </h1>
               <p className="mx-auto mt-4 max-w-[30ch] text-ink/70">
-                The parents will receive their official reveal code by email. You can close this page now.
+                {step.already
+                  ? 'An answer has already been sealed with this link, and it can’t be changed here. If something went wrong, please tell the parents.'
+                  : 'The parents will receive their official reveal code by email. You can close this page now.'}
               </p>
             </motion.div>
           </motion.div>

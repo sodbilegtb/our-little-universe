@@ -5,7 +5,7 @@ import { revealCodeSchema, type AdminMessage, type AdminView } from '@olu/shared
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/Dialog';
 import { Pill } from '@/components/ui/Pill';
-import { api } from '@/services/api';
+import { api, errorMessage } from '@/services/api';
 import { cn } from '@/lib/cn';
 import { OPTION_LETTERS } from '@/features/quiz/ordinal';
 import { VOTE_OPTIONS } from '@/features/voting/VoteScreen';
@@ -263,7 +263,9 @@ export function MessagesPanel({ view, onChanged }: { view: AdminView; onChanged:
   );
 }
 
-export function RevealPanel() {
+const clockFormat = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+export function RevealPanel({ view, onChanged }: { view: AdminView; onChanged: () => void }) {
   const admin = useAdminSession();
   const [code, setCode] = useState('');
   const [result, setResult] = useState<{ accepted: boolean; message: string } | null>(null);
@@ -272,9 +274,34 @@ export function RevealPanel() {
 
   const submit = async () => {
     setBusy(true);
-    setResult(await api.submitRevealCode(admin, code));
-    setBusy(false);
+    try {
+      const outcome = await api.submitRevealCode(admin, code);
+      setResult(outcome);
+      if (outcome.accepted) onChanged();
+    } catch (error) {
+      setResult({ accepted: false, message: errorMessage(error) });
+    } finally {
+      setBusy(false);
+    }
   };
+
+  if (view.reveal.status === 'REVEALING' || view.reveal.status === 'REVEALED') {
+    return (
+      <Panel title="Official reveal code">
+        <p role="status" className="flex items-center gap-2.5 text-sage">
+          <Check className="h-5 w-5" aria-hidden />
+          The code was accepted. The reveal is on the TV now.
+        </p>
+        {view.reveal.revealAt && (
+          <p className="mt-3 text-ivory-dim">
+            {view.reveal.status === 'REVEALED'
+              ? 'The secret is out.'
+              : `The TV shows the answer at ${clockFormat.format(new Date(view.reveal.revealAt))}.`}
+          </p>
+        )}
+      </Panel>
+    );
+  }
 
   return (
     <Panel title="Official reveal code">
