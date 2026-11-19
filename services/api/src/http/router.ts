@@ -129,6 +129,11 @@ export function createRouter(service: EventService, logger: Logger) {
       },
     };
 
+    // API Gateway answers CORS preflights itself (see the api Terraform module).
+    // Should one reach the Lambda anyway, never fail it: a failed preflight
+    // blocks every POST from the browser. API Gateway adds the CORS headers.
+    if (request.method.toUpperCase() === 'OPTIONS') return noContent();
+
     let response: ApiResponse;
     let errorCode: string | undefined;
     try {

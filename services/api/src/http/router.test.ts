@@ -98,6 +98,15 @@ describe('HTTP API', () => {
     expect((await call('GET', '/v1/views/tv')).json!.phase).toBe('LOBBY'); // nothing changed by the failures
   });
 
+  it('never fails a CORS preflight that reaches the Lambda', async () => {
+    const { call } = setup();
+    for (const path of ['/v1/guests', '/v1/admin/sessions', '/v1/anything']) {
+      const preflight = await call('OPTIONS', path);
+      expect(preflight.status).toBe(204);
+      expect(preflight.body).toBe('');
+    }
+  });
+
   it('rejects malformed host commands', async () => {
     const { call, signIn } = setup();
     const auth = `Bearer ${await signIn()}`;
