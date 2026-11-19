@@ -62,6 +62,12 @@ variable "email_sender_domain" {
   default     = ""
 }
 
+variable "email_dns_in_route53" {
+  description = "The sender domain's DNS is a Route 53 hosted zone in this account: Terraform writes the DKIM records itself."
+  type        = bool
+  default     = false
+}
+
 variable "email_recipients" {
   description = "Who receives the (test) reveal code."
   type        = list(string)

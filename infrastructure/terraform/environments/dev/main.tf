@@ -32,6 +32,7 @@ module "email" {
 
   sender_address      = var.email_sender
   sender_domain       = var.email_sender_domain
+  manage_dns_records  = var.email_dns_in_route53
   recipient_addresses = var.email_recipients
 }
 

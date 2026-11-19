@@ -11,4 +11,5 @@ alarm_email  = "you@example.com"
 # verification email from AWS first; click the link in each.
 # email_sender        = "reveal@example.com"
 # email_sender_domain = "example.com"   # optional: verify the whole domain (better delivery)
+# email_dns_in_route53 = true           # the domain's DNS is in Route 53 here: Terraform adds the DKIM records
 # email_recipients    = ["you@example.com"]

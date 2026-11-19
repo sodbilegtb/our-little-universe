@@ -32,7 +32,7 @@ output "region" {
 }
 
 output "email_dkim_records" {
-  description = "Add these CNAME records to the sender domain's DNS (only when email_sender_domain is set)."
+  description = "DKIM CNAME records of the sender domain (only when email_sender_domain is set). With email_dns_in_route53, Terraform has already added them."
   value       = module.email.dkim_records
 }
 

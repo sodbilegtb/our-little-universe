@@ -15,6 +15,12 @@ variable "sender_domain" {
   default     = ""
 }
 
+variable "manage_dns_records" {
+  description = "Write the DKIM records into the sender domain's public Route 53 hosted zone (it must be in this AWS account)."
+  type        = bool
+  default     = false
+}
+
 variable "recipient_addresses" {
   description = "Who receives the reveal code (the parents)."
   type        = list(string)

@@ -4,12 +4,17 @@ output "identity_arns" {
 }
 
 output "dkim_records" {
-  description = "CNAME records to add to the sender domain's DNS (empty when verifying a single address)."
-  value = var.sender_domain == "" ? [] : [
-    for token in aws_sesv2_email_identity.this[var.sender_domain].dkim_signing_attributes[0].tokens : {
+  description = "CNAME records for the sender domain's DNS (written by Terraform when manage_dns_records is on; empty when verifying a single address)."
+  value = [
+    for token in local.dkim_tokens : {
       name  = "${token}._domainkey.${var.sender_domain}"
       type  = "CNAME"
       value = "${token}.dkim.amazonses.com"
     }
   ]
+}
+
+output "dns_records_managed" {
+  description = "Whether Terraform wrote the DKIM records itself."
+  value       = local.dkim_record_count > 0
 }
