@@ -114,7 +114,7 @@ describe('voting', () => {
     const guests = Array.from({ length: 5 }, (_, i) => h.join(`G${i}`));
     h.commands('START_VOTING');
     guests.forEach((g, i) => h.run((s) => castVote(s, g, { choice: i % 2 ? 'BOY' : 'GIRL' }, h.clock.now)));
-    expect(toAdminView(h.state, h.clock.now, '').voting.tally).toEqual({ boy: 2, girl: 3, total: 5 });
+    expect(toAdminView(h.state, h.clock.now, '', 'TEST').voting.tally).toEqual({ boy: 2, girl: 3, total: 5 });
   });
 });
 
@@ -240,7 +240,7 @@ describe('messages', () => {
   it('persists every field the spec asks for', () => {
     const { h, guest } = inMessages();
     h.run((s) => submitMessage(s, guest, { clientMessageId: 'client-0001', text: '  Hello little one  ' }, h.ids, h.clock.now));
-    const [stored] = toAdminView(h.state, h.clock.now, '').messages.items;
+    const [stored] = toAdminView(h.state, h.clock.now, '', 'TEST').messages.items;
     expect(stored).toMatchObject({
       guestId: guest.id,
       displayName: 'Mia',
@@ -301,7 +301,7 @@ describe('messages', () => {
     const tv = toTvView(h.state, h.clock.now, '');
     expect(tv.messages.stars).toHaveLength(0);
     expect(JSON.stringify(tv)).not.toContain('Oops');
-    expect(toAdminView(h.state, h.clock.now, '').messages.items[0]).toMatchObject({ removed: true, approved: true });
+    expect(toAdminView(h.state, h.clock.now, '', 'TEST').messages.items[0]).toMatchObject({ removed: true, approved: true });
     expect(() => h.command({ type: 'SET_MESSAGE_APPROVAL', messageId: message.id, approved: true })).toThrow(/Restore/);
     // A removed message still counts toward the guest's limit.
     expect(toGuestView(h.state, guest.id, h.clock.now).messages.myCount).toBe(1);
@@ -327,7 +327,7 @@ describe('quiz editing', () => {
     expect(h.state.quiz.questions[0]?.text).toBe('Edited: Question number 1?');
     h.commands('START_VOTING', 'START_QUIZ');
     expect(codeOf(() => h.command({ type: 'UPDATE_QUIZ_QUESTIONS', questions }))).toBe('LOCKED');
-    expect(toAdminView(h.state, h.clock.now, '').quizEditable).toBe(false);
+    expect(toAdminView(h.state, h.clock.now, '', 'TEST').quizEditable).toBe(false);
   });
 
   it('rejects an incomplete quiz', () => {

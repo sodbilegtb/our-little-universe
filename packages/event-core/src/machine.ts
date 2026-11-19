@@ -32,12 +32,16 @@ export function isQuizEditable(state: EventState): boolean {
  * suits Lambda. Returns true when something changed.
  */
 export function settle(state: EventState, now: number): boolean {
-  const { quiz } = state;
+  const { quiz, reveal } = state;
   if (state.phase === 'QUIZ' && quiz.stage === 'QUESTION_OPEN' && quiz.closesAt !== null) {
     if (now > quiz.closesAt + state.settings.answerGraceMs) {
       quiz.stage = 'QUESTION_CLOSED';
       return true;
     }
+  }
+  if (reveal.status === 'REVEALING' && reveal.revealAt !== null && now >= reveal.revealAt) {
+    reveal.status = 'REVEALED';
+    return true;
   }
   return false;
 }

@@ -17,10 +17,36 @@ export type QuizStage =
   | 'LEADERBOARD'
   | 'RESULTS';
 
+/** CODE_SENT is derived for the host desk from the email delivery record. */
 export type DoctorStatus = 'NOT_STARTED' | 'LINK_ISSUED' | 'SUBMITTED' | 'CODE_SENT';
 
-/** No status here can carry a result. REVEALED is set only after authorization (Milestone 7). */
+/**
+ * No status here can carry a result. REVEALING starts once the host's code is
+ * accepted; the server releases the result only from `revealAt` on.
+ */
 export type RevealStatus = 'LOCKED' | 'AWAITING_CODE' | 'REVEALING' | 'REVEALED';
+
+/**
+ * Set by the server's environment, never by a client: dev and local are TEST,
+ * prod is LIVE. Test codes, links and emails can never unlock a live reveal.
+ */
+export type RevealMode = 'TEST' | 'LIVE';
+
+/** Times only. The result itself comes from a separate endpoint, and only from `revealAt` on. */
+export interface RevealView {
+  status: RevealStatus;
+  /** ISO time from which the result may be shown (server clock). */
+  revealAt: string | null;
+}
+
+export type CodeEmailStatus = 'NONE' | 'PENDING' | 'SENT' | 'FAILED' | 'SKIPPED';
+
+export interface DoctorView {
+  status: DoctorStatus;
+  linkExpiresAt: string | null;
+  /** Delivery of the reveal code email. Never contains the code. */
+  email: { status: CodeEmailStatus; attempts: number; sentAt: string | null };
+}
 
 export type AnswerOptions = readonly [string, string, string, string];
 
@@ -108,7 +134,7 @@ export interface TvView extends BaseEventView {
   quiz: QuizRoundView;
   leaderboard: LeaderboardEntry[];
   messages: { open: boolean; stars: MessageStar[]; featured: PublicMessage[] };
-  reveal: { status: RevealStatus };
+  reveal: RevealView;
 }
 
 export interface GuestSession {
@@ -140,8 +166,9 @@ export interface AdminView extends BaseEventView {
   quiz: QuizRoundView & { questions: QuizQuestionConfig[] };
   leaderboard: LeaderboardEntry[];
   messages: { open: boolean; items: AdminMessage[] };
-  doctor: { status: DoctorStatus };
-  reveal: { status: RevealStatus };
+  mode: RevealMode;
+  doctor: DoctorView;
+  reveal: RevealView;
 }
 
 /**
@@ -172,4 +199,34 @@ export interface EventExport {
   };
   /** All messages in the order they were sent, including hidden and removed ones (flagged). */
   messages: (AdminMessage & { order: number })[];
+}
+
+/** Doctor link check: never creates a code. */
+export interface DoctorSessionResult {
+  mode: RevealMode;
+  /** READY: the doctor can choose. SEALED: an answer was already sealed with this link. */
+  status: 'READY' | 'SEALED';
+}
+
+export interface DoctorLinkResult {
+  /** Shown once. Only a hash of the token is stored. */
+  url: string;
+  expiresAt: string;
+}
+
+export interface RevealCodeResult {
+  accepted: boolean;
+  message: string;
+  revealAt?: string;
+}
+
+/** Test mode only: a simulated doctor's code, so rehearsals don't need email. */
+export interface SimulatedDoctorResult {
+  code: string;
+}
+
+/** Served by the separate reveal service, and only from `revealAt` on. */
+export interface RevealResult {
+  result: 'BOY' | 'GIRL';
+  revealAt: string;
 }

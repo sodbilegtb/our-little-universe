@@ -112,3 +112,17 @@ export const adminCommandSchema = z.discriminatedUnion('type', [
 
 export const adminSignInSchema = z.object({ password: z.string().min(1, 'Enter the host password.').max(200) });
 export const revealCodeRequestSchema = z.object({ code: z.string().max(40) });
+
+/** Doctor link tokens: 256-bit, base64url. They travel in request bodies, never in URLs the server logs. */
+export const doctorTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{40,64}$/, 'This link isn’t complete.');
+export const doctorSessionSchema = z.object({ token: doctorTokenSchema }).strict();
+export const doctorSelectionSchema = z
+  .object({
+    token: doctorTokenSchema,
+    choice: z.enum(['BOY', 'GIRL']),
+    /** Generated once on the device when the doctor confirms; repeats of it are the same submission. */
+    submissionId: z.string().regex(/^[A-Za-z0-9-]{16,64}$/),
+    confirmed: z.literal(true),
+  })
+  .strict();
+export const secretResetSchema = z.object({ confirm: z.literal('RESET') }).strict();

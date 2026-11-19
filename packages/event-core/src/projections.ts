@@ -8,6 +8,8 @@ import {
   type GuestView,
   type LeaderboardEntry,
   type QuizRoundView,
+  type RevealMode,
+  type RevealView,
   type ScoreRecord,
   type TvView,
   type VoteTally,
@@ -102,7 +104,7 @@ export function toTvView(state: EventState, now: number, joinUrl: string): TvVie
       stars: visible.map((m) => ({ id: m.id, order: m.order, approved: m.approved })),
       featured: visible.filter((m) => m.approved).map((m) => ({ id: m.id, displayName: m.displayName, text: m.text })),
     },
-    reveal: { status: state.reveal.status },
+    reveal: revealView(state),
   };
 }
 
@@ -130,7 +132,15 @@ export function toGuestView(state: EventState, guestId: string | null, now: numb
   };
 }
 
-export function toAdminView(state: EventState, now: number, joinUrl: string): AdminView {
+function revealView(state: EventState): RevealView {
+  return { status: state.reveal.status, revealAt: iso(state.reveal.revealAt) };
+}
+
+/**
+ * The host desk view. `mode` comes from the server's environment. The email
+ * delivery status lives in the secret store, so the server fills it in.
+ */
+export function toAdminView(state: EventState, now: number, joinUrl: string, mode: RevealMode): AdminView {
   return {
     ...base(state, now),
     joinUrl,
@@ -147,8 +157,13 @@ export function toAdminView(state: EventState, now: number, joinUrl: string): Ad
         .sort((a, b) => b.order - a.order)
         .map(toAdminMessage),
     },
-    doctor: { status: state.doctor.status },
-    reveal: { status: state.reveal.status },
+    mode,
+    doctor: {
+      status: state.doctor.status,
+      linkExpiresAt: iso(state.doctor.linkExpiresAt),
+      email: { status: state.doctor.status === 'SUBMITTED' ? 'PENDING' : 'NONE', attempts: 0, sentAt: null },
+    },
+    reveal: revealView(state),
   };
 }
 

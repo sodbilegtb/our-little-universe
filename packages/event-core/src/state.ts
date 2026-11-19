@@ -12,7 +12,8 @@ import {
  * The complete event state as the server holds it. Times are epoch milliseconds.
  *
  * Nothing in here can hold the baby's gender: the doctor's selection lives in a
- * separate, encrypted store owned by a narrowly privileged component (Milestone 6).
+ * separate, encrypted store. This state only knows *that* an answer was sealed
+ * (an opaque selection id), never what it is.
  */
 
 export interface GuestRecord {
@@ -82,9 +83,52 @@ export interface EventState {
     items: MessageRecord[];
     nextOrder: number;
   };
-  doctor: { status: DoctorStatus };
-  reveal: { status: RevealStatus };
+  doctor: DoctorState;
+  reveal: RevealState;
   settings: EventSettings;
+}
+
+export interface DoctorState {
+  status: Exclude<DoctorStatus, 'CODE_SENT'>;
+  /** Increments on every reset, so nothing from before a reset can be reused. */
+  generation: number;
+  /** The one doctor link currently accepted. Issuing a new link retires the old one. */
+  linkId: string | null;
+  linkExpiresAt: number | null;
+  /** Opaque id of the sealed answer in the secret store. Never the answer itself. */
+  selectionId: string | null;
+  submittedAt: number | null;
+}
+
+export interface RevealState {
+  status: RevealStatus;
+  /** When the host's code was accepted. */
+  startedAt: number | null;
+  /** The server releases the result from this moment on, not before. */
+  revealAt: number | null;
+}
+
+export const INITIAL_DOCTOR: DoctorState = {
+  status: 'NOT_STARTED',
+  generation: 0,
+  linkId: null,
+  linkExpiresAt: null,
+  selectionId: null,
+  submittedAt: null,
+};
+
+export const INITIAL_REVEAL: RevealState = { status: 'LOCKED', startedAt: null, revealAt: null };
+
+/**
+ * Fills in fields added after an event was first stored (events created before
+ * Milestone 6 only had `doctor.status` and `reveal.status`).
+ */
+export function upgradeState<T extends Pick<EventState, 'doctor' | 'reveal'>>(state: T): T {
+  return {
+    ...state,
+    doctor: { ...INITIAL_DOCTOR, ...state.doctor },
+    reveal: { ...INITIAL_REVEAL, ...state.reveal },
+  };
 }
 
 export const DEFAULT_SETTINGS: EventSettings = {
@@ -118,8 +162,8 @@ export function createEventState(input: CreateEventInput): EventState {
       answers: {},
     },
     messages: { open: false, items: [], nextOrder: 0 },
-    doctor: { status: 'NOT_STARTED' },
-    reveal: { status: 'LOCKED' },
+    doctor: { ...INITIAL_DOCTOR },
+    reveal: { ...INITIAL_REVEAL },
     settings: { ...DEFAULT_SETTINGS, ...input.settings },
   };
 }
