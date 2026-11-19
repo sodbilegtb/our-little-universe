@@ -43,6 +43,10 @@ const schema = z
     /** Mailer only. */
     EMAIL_SENDER: z.email().optional(),
     EMAIL_RECIPIENTS: z.string().optional(),
+    /** Mailer only: Amazon SES, or a Gmail account with an app password (SMTP). */
+    EMAIL_TRANSPORT: z.enum(['ses', 'gmail']).default('ses'),
+    /** Mailer only, with gmail: name of the SSM SecureString holding the app password. */
+    GMAIL_APP_PASSWORD_PARAMETER: z.string().regex(/^\/[A-Za-z0-9_./-]+$/).optional(),
     LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   })
   .superRefine((env, ctx) => {
@@ -64,6 +68,9 @@ const schema = z
         message: 'Deployed environments need SECRETS_TABLE_NAME, KMS_KEY_ARN and MAILER_FUNCTION_NAME',
         path: ['SECRETS_TABLE_NAME'],
       });
+    }
+    if (env.EMAIL_TRANSPORT === 'gmail' && env.ENVIRONMENT !== 'local' && !env.GMAIL_APP_PASSWORD_PARAMETER) {
+      ctx.addIssue({ code: 'custom', message: 'EMAIL_TRANSPORT=gmail needs GMAIL_APP_PASSWORD_PARAMETER', path: ['GMAIL_APP_PASSWORD_PARAMETER'] });
     }
     const recipients = (env.EMAIL_RECIPIENTS ?? '').split(',').map((r) => r.trim()).filter(Boolean);
     for (const recipient of recipients) {
@@ -99,6 +106,8 @@ export interface AppConfig {
   revealDelayMs: number;
   emailSender: string | undefined;
   emailRecipients: string[];
+  emailTransport: RawConfig['EMAIL_TRANSPORT'];
+  gmailAppPasswordParameter: string | undefined;
 }
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): AppConfig {
@@ -131,5 +140,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     revealDelayMs: c.REVEAL_DELAY_SECONDS * 1000,
     emailSender: c.EMAIL_SENDER,
     emailRecipients: (c.EMAIL_RECIPIENTS ?? '').split(',').map((r) => r.trim()).filter(Boolean),
+    emailTransport: c.EMAIL_TRANSPORT,
+    gmailAppPasswordParameter: c.GMAIL_APP_PASSWORD_PARAMETER,
   };
 }

@@ -1,9 +1,11 @@
 import { KMSClient } from '@aws-sdk/client-kms';
 import { SESv2Client } from '@aws-sdk/client-sesv2';
+import { SSMClient } from '@aws-sdk/client-ssm';
 import { createLogger } from '../app/logger';
 import { loadConfig } from '../config/config';
 import { deliverRevealCode, type MailerDeps } from '../mail/deliverCode';
-import { SesTransport } from '../mail/transport';
+import { GmailTransport, ssmAppPassword } from '../mail/gmail';
+import { SesTransport, type MailTransport } from '../mail/transport';
 import type { MailRequest } from '../mail/trigger';
 import { createDocumentClient } from '../repositories/dynamo/DynamoEventRepository';
 import { DynamoSecretStore } from '../secret/DynamoSecretStore';
@@ -12,9 +14,18 @@ import { KmsOpener } from '../secret/vault';
 /*
  * The mailer Lambda, invoked asynchronously by the API with ids only. Its role
  * may open sealed codes (never the doctor's answer), read and update the email
- * fields of a sealed answer, and send through SES. A thrown error makes Lambda
- * retry, and every retry sends the same code.
+ * fields of a sealed answer, and send through SES or, with EMAIL_TRANSPORT=gmail,
+ * through a Gmail account. A thrown error makes Lambda retry, and every retry
+ * sends the same code.
  */
+
+function transportFor(config: ReturnType<typeof loadConfig>): MailTransport {
+  if (config.emailTransport === 'gmail') {
+    if (!config.gmailAppPasswordParameter) throw new Error('GMAIL_APP_PASSWORD_PARAMETER is required');
+    return new GmailTransport(ssmAppPassword(config.gmailAppPasswordParameter, new SSMClient({ region: config.region })));
+  }
+  return new SesTransport(new SESv2Client({ region: config.region }));
+}
 
 let deps: MailerDeps | undefined;
 
@@ -25,7 +36,7 @@ function init(): MailerDeps {
   return {
     store: new DynamoSecretStore(createDocumentClient({ region: config.region }), config.secretsTableName),
     opener: new KmsOpener(new KMSClient({ region: config.region }), config.kmsKeyArn),
-    transport: new SesTransport(new SESv2Client({ region: config.region })),
+    transport: transportFor(config),
     logger,
     now: Date.now,
     config: {
