@@ -49,3 +49,21 @@ variable "monthly_budget_usd" {
   type    = number
   default = 10
 }
+
+variable "email_sender" {
+  description = "From address of the reveal code email. Empty: no email (the host desk shows it as skipped)."
+  type        = string
+  default     = ""
+}
+
+variable "email_sender_domain" {
+  description = "Verify this whole domain for sending (recommended; add the DKIM records from the output to DNS)."
+  type        = string
+  default     = ""
+}
+
+variable "email_recipients" {
+  description = "Who receives the (test) reveal code."
+  type        = list(string)
+  default     = []
+}

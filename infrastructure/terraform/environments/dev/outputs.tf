@@ -30,3 +30,12 @@ output "admin_password_parameter" {
 output "region" {
   value = var.region
 }
+
+output "email_dkim_records" {
+  description = "Add these CNAME records to the sender domain's DNS (only when email_sender_domain is set)."
+  value       = module.email.dkim_records
+}
+
+output "secrets_table_name" {
+  value = module.secret.secrets_table_name
+}

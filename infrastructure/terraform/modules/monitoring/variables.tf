@@ -32,3 +32,9 @@ variable "api_5xx_threshold" {
   type        = number
   default     = 5
 }
+
+variable "secret_function_names" {
+  description = "The mailer and reveal Lambdas, alarmed on any error."
+  type        = list(string)
+  default     = []
+}

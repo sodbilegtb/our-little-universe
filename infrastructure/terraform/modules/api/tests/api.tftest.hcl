@@ -31,6 +31,14 @@ variables {
   public_app_url                = "https://main.d1example.amplifyapp.com"
   allowed_origins               = ["https://main.d1example.amplifyapp.com"]
   admin_password_parameter_name = "/olu/test/admin-password-hash"
+  reveal_mode                   = "TEST"
+  secrets_table_name            = "olu-test-secrets"
+  secrets_table_arn             = "arn:aws:dynamodb:eu-central-1:123456789012:table/olu-test-secrets"
+  kms_key_arn                   = "arn:aws:kms:eu-central-1:123456789012:key/11111111-2222-3333-4444-555555555555"
+  mailer_function_name          = "olu-test-mailer"
+  mailer_function_arn           = "arn:aws:lambda:eu-central-1:123456789012:function:olu-test-mailer"
+  reveal_function_name          = "olu-test-reveal"
+  reveal_invoke_arn             = "arn:aws:apigateway:eu-central-1:lambda:path/2015-03-31/functions/arn:aws:lambda:eu-central-1:123456789012:function:olu-test-reveal/invocations"
 }
 
 run "lambda_configuration" {
@@ -91,6 +99,38 @@ run "least_privilege_iam" {
       "arn:aws:ssm:eu-central-1:123456789012:parameter/olu/test/admin-password-hash",
     )
     error_message = "SSM access is limited to the one parameter."
+  }
+}
+
+run "the_api_never_opens_the_secret" {
+  command = apply
+
+  assert {
+    condition = length(setintersection(
+      toset(flatten([for s in jsondecode(aws_iam_role_policy.lambda.policy).Statement : s.Action])),
+      toset(["kms:Decrypt", "kms:ReEncryptFrom", "kms:*"]),
+    )) == 0
+    error_message = "The API (and so the host desk) can't decrypt anything."
+  }
+
+  assert {
+    condition = alltrue([
+      for attribute in ["choiceCiphertext", "codeCiphertext"] : !contains(flatten([
+        for s in jsondecode(aws_iam_role_policy.lambda.policy).Statement :
+        try(s.Condition["ForAllValues:StringEquals"]["dynamodb:Attributes"], [])
+      ]), attribute)
+    ])
+    error_message = "The API can't even read a ciphertext back."
+  }
+
+  assert {
+    condition     = aws_apigatewayv2_route.reveal.route_key == "GET /v1/reveal/result" && aws_apigatewayv2_integration.reveal.integration_uri == var.reveal_invoke_arn
+    error_message = "The result comes from the separate reveal Lambda."
+  }
+
+  assert {
+    condition     = one(aws_lambda_function.api.environment).variables["REVEAL_MODE"] == "TEST"
+    error_message = "The mode is set by the environment."
   }
 }
 

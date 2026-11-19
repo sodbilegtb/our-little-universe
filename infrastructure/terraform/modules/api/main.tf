@@ -1,5 +1,6 @@
-# The REST API: one Lambda behind an API Gateway HTTP API ($default route;
-# the Lambda's own router handles paths). Code: services/api.
+# The REST API: one Lambda behind an API Gateway HTTP API (GET and POST
+# routes; the Lambda's own router handles paths), plus one route to the
+# separate reveal Lambda (secret module). Code: services/api.
 
 terraform {
   required_providers {
@@ -53,6 +54,12 @@ resource "aws_lambda_function" "api" {
       PUBLIC_APP_URL                = var.public_app_url
       ADMIN_PASSWORD_HASH_PARAMETER = var.admin_password_parameter_name
       ADMIN_SESSION_HOURS           = tostring(var.admin_session_hours)
+      REVEAL_MODE                   = var.reveal_mode
+      SECRETS_TABLE_NAME            = var.secrets_table_name
+      KMS_KEY_ARN                   = var.kms_key_arn
+      MAILER_FUNCTION_NAME          = var.mailer_function_name
+      DOCTOR_LINK_HOURS             = tostring(var.doctor_link_hours)
+      REVEAL_DELAY_SECONDS          = tostring(var.reveal_delay_seconds)
       LOG_LEVEL                     = var.log_level
       NODE_OPTIONS                  = "--enable-source-maps"
     }
@@ -100,6 +107,21 @@ resource "aws_apigatewayv2_route" "proxy" {
   target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
 }
 
+# The result comes from its own Lambda, which alone may open the answer.
+resource "aws_apigatewayv2_integration" "reveal" {
+  api_id                 = aws_apigatewayv2_api.http.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = var.reveal_invoke_arn
+  payload_format_version = "2.0"
+  timeout_milliseconds   = 6000
+}
+
+resource "aws_apigatewayv2_route" "reveal" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "GET /v1/reveal/result"
+  target    = "integrations/${aws_apigatewayv2_integration.reveal.id}"
+}
+
 resource "aws_cloudwatch_log_group" "access" {
   name              = "/aws/apigateway/${var.name}-api"
   retention_in_days = var.log_retention_days
@@ -128,6 +150,14 @@ resource "aws_apigatewayv2_stage" "default" {
       error     = "$context.integrationErrorMessage"
     })
   }
+}
+
+resource "aws_lambda_permission" "reveal" {
+  statement_id  = "AllowApiGatewayInvokeReveal"
+  action        = "lambda:InvokeFunction"
+  function_name = var.reveal_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.http.execution_arn}/*/GET/v1/reveal/result"
 }
 
 resource "aws_lambda_permission" "api_gateway" {

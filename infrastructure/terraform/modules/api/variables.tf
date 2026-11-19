@@ -109,3 +109,53 @@ variable "log_level" {
   type    = string
   default = "info"
 }
+
+variable "reveal_mode" {
+  description = "TEST everywhere but prod (see the secret module)."
+  type        = string
+
+  validation {
+    condition     = contains(["TEST", "LIVE"], var.reveal_mode)
+    error_message = "reveal_mode must be TEST or LIVE."
+  }
+}
+
+variable "secrets_table_name" {
+  type = string
+}
+
+variable "secrets_table_arn" {
+  type = string
+}
+
+variable "kms_key_arn" {
+  type = string
+}
+
+variable "mailer_function_name" {
+  type = string
+}
+
+variable "mailer_function_arn" {
+  type = string
+}
+
+variable "reveal_function_name" {
+  type = string
+}
+
+variable "reveal_invoke_arn" {
+  type = string
+}
+
+variable "doctor_link_hours" {
+  description = "How long a doctor link stays valid."
+  type        = number
+  default     = 48
+}
+
+variable "reveal_delay_seconds" {
+  description = "From the host's code being accepted to the moment the result may be shown."
+  type        = number
+  default     = 26
+}

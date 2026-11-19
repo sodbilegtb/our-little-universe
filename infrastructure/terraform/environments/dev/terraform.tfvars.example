@@ -6,3 +6,9 @@ alarm_email  = "you@example.com"
 
 # Uncomment to call the dev API from `npm run dev` on your laptop:
 # extra_allowed_origins = ["http://localhost:5173"]
+
+# Reveal code email (Amazon SES). In the SES sandbox every address below gets a
+# verification email from AWS first; click the link in each.
+# email_sender        = "reveal@example.com"
+# email_sender_domain = "example.com"   # optional: verify the whole domain (better delivery)
+# email_recipients    = ["you@example.com"]

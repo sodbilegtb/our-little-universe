@@ -25,6 +25,15 @@ mock_provider "aws" {
   mock_resource "aws_iam_role" {
     defaults = { arn = "arn:aws:iam::123456789012:role/olu-dev-api" }
   }
+  mock_resource "aws_kms_key" {
+    defaults = { arn = "arn:aws:kms:eu-central-1:123456789012:key/11111111-2222-3333-4444-555555555555" }
+  }
+  mock_resource "aws_lambda_function" {
+    defaults = {
+      arn        = "arn:aws:lambda:eu-central-1:123456789012:function:olu-dev-fn"
+      invoke_arn = "arn:aws:apigateway:eu-central-1:lambda:path/2015-03-31/functions/arn:aws:lambda:eu-central-1:123456789012:function:olu-dev-fn/invocations"
+    }
+  }
   mock_resource "aws_sns_topic" {
     defaults = { arn = "arn:aws:sns:eu-central-1:123456789012:olu-dev-alarms" }
   }
@@ -57,6 +66,11 @@ run "dev_stack" {
   assert {
     condition     = module.api.throttling.rate == 300 && module.api.throttling.burst == 600
     error_message = "The dev API allows about 150 phones."
+  }
+
+  assert {
+    condition     = output.secrets_table_name == "olu-dev-secrets" && output.table_name != output.secrets_table_name
+    error_message = "Secrets have their own table."
   }
 
   assert {

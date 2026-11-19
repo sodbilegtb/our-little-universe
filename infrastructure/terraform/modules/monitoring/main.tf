@@ -34,6 +34,26 @@ resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
   ok_actions          = [aws_sns_topic.alarms.arn]
 }
 
+# The mailer and the reveal service: a failure there means a code email or the
+# reveal itself didn't work, so it's worth an email right away.
+resource "aws_cloudwatch_metric_alarm" "secret_errors" {
+  for_each = toset(var.secret_function_names)
+
+  alarm_name          = "${each.value}-errors"
+  alarm_description   = "${each.value} failed (code email or reveal result)."
+  namespace           = "AWS/Lambda"
+  metric_name         = "Errors"
+  dimensions          = { FunctionName = each.value }
+  statistic           = "Sum"
+  period              = 60
+  evaluation_periods  = 1
+  threshold           = 0
+  comparison_operator = "GreaterThanThreshold"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [aws_sns_topic.alarms.arn]
+  ok_actions          = [aws_sns_topic.alarms.arn]
+}
+
 resource "aws_cloudwatch_metric_alarm" "lambda_throttles" {
   alarm_name          = "${var.name}-api-throttles"
   alarm_description   = "The API Lambda hit its concurrency limit."
