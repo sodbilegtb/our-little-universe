@@ -420,10 +420,43 @@ async function main() {
   await host('SET_MESSAGE_REMOVED', { messageId: ours[0].id, removed: false });
   check((await adminView()).messages.items.length === view.messages.items.length, 'remove and restore keep the message');
 
+  console.log('\nThe secret (test mode: a simulated doctor)');
+  const simulated = await call('host', 'POST', '/v1/admin/doctor/simulate', { auth: hostAuth });
+  let code = null;
+  if (simulated.status === 404) {
+    console.log('  - live mode: no simulated doctor, the secret steps are skipped');
+  } else {
+    code = simulated.body?.code;
+    check(simulated.status === 201 && /^[2-9A-HJKMNP-Z]{4}(-[2-9A-HJKMNP-Z]{4}){2}$/.test(code ?? ''), 'the answer is sealed and a code drawn');
+    let email = 'PENDING';
+    await until(async () => {
+      email = (await adminView()).doctor.email.status;
+      return email !== 'PENDING';
+    }, 60_000, 'the code email');
+    check(email === 'SENT' || email === 'SKIPPED', `code email: ${email === 'SKIPPED' ? 'skipped (no recipients configured)' : email.toLowerCase()}`);
+    const early = await call('view', 'GET', '/v1/reveal/result');
+    check(early.status === 409, 'the result stays sealed before the reveal');
+    const tv = await call('view', 'GET', '/v1/views/tv');
+    check(!/"result"|selectionId|choiceCiphertext/.test(JSON.stringify(tv.body)), 'the TV view carries no answer');
+  }
+
   console.log('\nReveal and finish');
   await host('START_REVEAL');
   mark('reveal phase', (v) => v.phase === 'REVEAL');
   await sleep(POLL_MS * 3);
+  if (code) {
+    const wrong = await call('host', 'POST', '/v1/admin/reveal-code', { body: { code: '2222-2222-2222' }, auth: hostAuth });
+    check(wrong.status === 200 && wrong.body.accepted === false, 'a wrong code is refused');
+    const accepted = await call('host', 'POST', '/v1/admin/reveal-code', { body: { code }, auth: hostAuth });
+    check(accepted.body?.accepted === true, 'the emailed code unlocks the reveal');
+    const revealAt = Date.parse(accepted.body?.revealAt ?? '');
+    const before = await call('view', 'GET', '/v1/reveal/result');
+    check(before.status === 409, 'the result stays sealed during the countdown');
+    await sleep(Math.max(0, revealAt - Date.now()) + 1500);
+    const after = await call('view', 'GET', '/v1/reveal/result');
+    // The rehearsal never prints the (simulated) answer, only that it was released.
+    check(after.status === 200 && /^(BOY|GIRL)$/.test(after.body?.result ?? ''), 'the reveal service releases the result at the reveal moment');
+  }
   await host('FINISH_EVENT');
   mark('finished', (v) => v.phase === 'FINISHED');
   await sleep(POLL_MS * 3);
