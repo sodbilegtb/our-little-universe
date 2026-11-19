@@ -1,0 +1,30 @@
+{
+  "name": "our-little-universe",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Our Little Universe: an interactive, synchronized baby gender reveal experience.",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "services/*"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "npm run dev -w @olu/web",
+    "dev:local": "node scripts/dev-local.mjs",
+    "dev:api": "npm run dev -w @olu/api",
+    "build": "npm run build -w @olu/web && npm run build -w @olu/api",
+    "preview": "npm run preview -w @olu/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "test:e2e": "npm run test:e2e -w @olu/web",
+    "test:e2e:api": "npm run test:e2e:api -w @olu/web",
+    "aws:build-api": "npm run build -w @olu/api",
+    "aws:set-password": "npm run set-password -w @olu/api --",
+    "aws:deploy-web": "node scripts/aws/deploy-web.mjs",
+    "aws:smoke": "node scripts/aws/smoke-test.mjs",
+    "rehearse": "node scripts/rehearse.mjs"
+  }
+}
