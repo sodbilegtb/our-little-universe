@@ -136,7 +136,7 @@ npm run aws:smoke -- dev                               # read-only checks
 ADMIN_PASSWORD='…' SMOKE_WRITE=1 npm run aws:smoke -- dev   # also sign-in and a test guest
 ```
 
-It checks health, the TV view and its join URL, CORS (the app allowed, other sites refused), that host actions need sign-in, that development routes are off, and that the web app serves `/party` with its Content-Security-Policy. `SMOKE_WRITE=1` adds a guest named "Smoke test" to the event. The preview reset tools are disabled in AWS, so to start a fresh rehearsal, change `event_id` in the tfvars and apply again.
+It checks health, the TV view and its join URL, CORS (the app allowed, other sites refused), that host actions need sign-in, that development routes are off, and that the web app serves `/party` with its Content-Security-Policy. `SMOKE_WRITE=1` adds a guest named "Smoke test" to the event. The preview reset tools are disabled in AWS; to start over in test mode, use "Start a new rehearsal" on the host desk.
 
 ## 7. Run the DynamoDB contract tests against real DynamoDB
 
@@ -154,10 +154,10 @@ Your CLI user needs `dynamodb:CreateTable`, `DeleteTable`, `DescribeTable` and i
 Before inviting people, let a script play a whole evening against the deployed API: a host, a TV and dozens of phones that poll exactly like the real app.
 
 ```bash
-ADMIN_PASSWORD='…' npm run rehearse -- --env dev --guests 40
+ADMIN_PASSWORD='…' npm run rehearse -- --env dev --guests 40 --fresh
 ```
 
-It plays the event through to the end, so it needs a fresh event (phase lobby, no votes yet), and you'll want another fresh one afterwards for step 9. Set a new `event_id` in `terraform.tfvars` (for example `rehearsal-2`) and apply; earlier rehearsals stay in the table untouched. It refuses to run against prod.
+It plays the event through to the end, so it needs a fresh event (phase lobby, no votes yet). Add `--fresh` to start a new rehearsal run first (test mode only, like "Start a new rehearsal" on the host desk); earlier runs stay in the table untouched. Do the same before step 9. It refuses to run against prod.
 
 It checks, from the server's own answers:
 - every guest is registered, and every vote, answer and message is counted exactly once, even with double taps, retries and changes of mind;
@@ -193,7 +193,10 @@ Use the checklist below with at least two phones (one iOS, one Android if you ca
 - [ ] Refresh the TV in the middle of the quiz; it returns to the same screen.
 - [ ] Messages: stars appear on the TV; text shows only after you approve it. Remove one and restore it from "Removed messages".
 - [ ] Keep the evening: "Prepare downloads", then save the archive and the three CSV files and open each one.
-- [ ] Close messages; phones show "Look at the big screen!" (the reveal itself is Milestone 7).
+- [ ] Start the reveal; phones show "Look at the big screen!".
+- [ ] "Simulate the doctor (test)", enter the code: the TV plays the whole sequence on the TV's real screen and browser. Check it runs smoothly, the countdown is readable from across the room, and the result appears only on the TV.
+- [ ] Refresh the TV during the countdown: it picks up where it was. Refresh again after the result: it goes straight to the celebration.
+- [ ] Finish: the thank-you screen shows the result. "Start a new rehearsal" brings everyone back to the lobby.
 - [ ] CloudWatch: the Lambda log group shows one structured line per request and no tokens or passwords.
 
 ## 10. Costs

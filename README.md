@@ -115,17 +115,18 @@ docs/                      Architecture, API, data model, deployment, design sys
 
 **Running on AWS (dev)**
 - The web app on Amplify, the API on Lambda and DynamoDB, set up with [`docs/deployment.md`](docs/deployment.md).
-- The DynamoDB contract tests pass against real DynamoDB, and the rehearsal (`npm run rehearse`) passes with 40 simulated phones.
+- The DynamoDB contract tests pass against real DynamoDB, and the rehearsal (`npm run rehearse`) passes with simulated phones.
+- The secret: one-time doctor link, KMS-sealed answer and code, code email via SES (or Gmail), verified reveal code, result released only at the reveal moment by a separate Lambda. See [`docs/security.md`](docs/security.md).
 
 **Built and tested, not yet deployed to AWS**
-- The secret: one-time doctor link, KMS-sealed answer and code, code email via SES or Gmail, verified reveal code, result released only at the reveal moment by a separate Lambda. See [`docs/security.md`](docs/security.md).
+- The cinematic TV reveal (Milestone 7): about 30 seconds on the server clock, the result requested only at the reveal moment, the celebration, and recovery after a TV refresh. See [`docs/milestones.md`](docs/milestones.md).
+- "Start a new rehearsal" (test mode only): back to the lobby without a new event id, nothing erased.
 
 **Still mock**
 - The browser-only preview (`services/api/mock`), including a test-mode stand-in for the secret.
 
 **Not started (by design)**
-- The cinematic TV reveal sequence (Milestone 7). No gender value exists anywhere in this codebase; the doctor's answer only ever exists sealed.
-- Audio. The TV emits scene cues (`src/lib/tvCues.ts`) as the extension point for future TV-only music.
+- Audio. The TV emits scene and reveal-stage cues (`src/lib/tvCues.ts`) as the extension point for future TV-only music.
 - The production environment (Milestone 8).
 
 See [`docs/`](docs) for details.

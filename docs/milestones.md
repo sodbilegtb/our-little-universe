@@ -165,7 +165,7 @@ The DynamoDB repository had not run against a real DynamoDB engine at the end of
 ### Not yet verified
 - The rehearsal and real-device checklist against AWS (`docs/deployment.md`, steps 8 and 9). They need Milestone 4 applied.
 
-## Milestone 6: Doctor security and email (done locally; AWS deployment pending)
+## Milestone 6: Doctor security and email (done, verified on AWS)
 
 ### Workflow
 - **Doctor link:** the host creates a one-time doctor link (shown once, with a QR code). The token is in the URL fragment and only its hash is stored. It is valid for 48 h, and a new link retires the old one.
@@ -193,12 +193,42 @@ The DynamoDB repository had not run against a real DynamoDB engine at the end of
 - **Terraform:** 20 `terraform test` runs; a mutation check proves the IAM tests catch a mailer that could open the answer.
 - **Local rehearsal:** the whole secret flow passes.
 
-### Not yet verified
-- Nothing applied to AWS yet: KMS, IAM attribute conditions, SES delivery and the reveal Lambda need the dev deployment and `npm run rehearse -- --env dev`.
+### Verified on AWS (dev)
+- KMS, the IAM attribute conditions, the reveal Lambda and the code email (SES from a DKIM-verified domain, Route 53 records written by Terraform) work on the dev deployment; the 20-guest rehearsal passes.
+- The rehearsal found a real bug only DynamoDB can produce: a query is not a snapshot, so a view could carry a newer revision than its content. Loads are now labelled with the revision read before them, and clients fetch again when a view arrives behind the revision.
+- Gmail (SMTP with an app password) exists as a second way to send the code email (`email_transport`).
 
 ### Security limits
 - An AWS account administrator can change policies and decrypt on purpose. The design prevents accidental and application-level exposure. A stronger option (an external key custodian with a time-locked key policy) is described in `docs/security.md`.
 
-## Milestone 7: Cinematic reveal (next)
+## Milestone 7: Cinematic reveal (done locally; AWS deployment pending)
 
-- The 30-second TV sequence, synchronized to the server's `revealAt`, the result fetched only at the reveal moment, the celebration scene, and recovery after a TV refresh.
+### The sequence
+About 30 seconds on the TV, laid out around the server's `revealAt` (R), see `apps/web/src/features/reveal/timeline.ts`:
+
+| From | Stage | On screen |
+|---|---|---|
+| code accepted | hush | "THE FINAL SECRET" fades, the room darkens, stars come out |
+| R-21 s | gather | the stars converge and a heart of light is drawn |
+| R-11 s | tension | the heart beats faster, then folds into one point |
+| R-5 s | countdown | 5, 4, 3, 2, 1 |
+| R | pause | a breath of darkness while the TV asks for the result |
+| R+1.2 s | burst | a flash of light, the colour, confetti, "IT'S A BOY!" or "IT'S A GIRL!" |
+| R+9 s | celebrate | the celebration settles |
+
+- **Secrecy:** the TV requests the result only once the reveal moment has come (server clock), and the burst waits for it. Before that no page, bundle or response holds it; the end-to-end test against the real API checks that the first request comes 26 s after the code. Pink and blue (soft dawn tones) appear only from the burst on. Phones keep showing "Look at the big screen!".
+- **Refresh:** the stage is computed from the server clock, so a refreshed TV picks up at the right moment; one that returns long after the burst shows the celebration without replaying it.
+- **After the evening:** the thank-you screen shows the result too (the reveal service keeps answering in the finished phase, never before `revealAt`).
+- **Reduced motion:** no moving stars, no flash, no confetti; the same moments as calm fades.
+- **Music:** none. The sequence announces its stages (`reveal-build`, `reveal-countdown`, `reveal-burst`, `reveal-celebration`) as TV cues, ready for TV-only audio later.
+
+### A new rehearsal (test mode only)
+- "Start a new rehearsal" on the host desk, and `npm run rehearse -- --env dev --fresh`, start the evening over in the lobby, so the reveal can be tried again without a new `event_id`.
+- Nothing is erased: guest, vote, answer and message items carry their run, and only the current run is loaded. The earlier run's sealed answer is retired, so its code unlocks nothing. Live mode refuses it (`404`).
+
+### Verified
+- Timeline unit tests; API tests for new runs (no deletes, old code dead, live refuses) on both storage backends; Playwright on the mock and the local API: the whole sequence, a refresh mid-sequence and after it, the result request timing, phones without the result, the thank-you screen, and a new rehearsal.
+- Frame-by-frame review of the sequence at 1920×1080.
+
+### Not yet verified
+- On AWS and on the real TV (`docs/deployment.md`, step 9).

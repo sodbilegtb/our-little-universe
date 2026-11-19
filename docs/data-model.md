@@ -21,6 +21,8 @@ It uses on-demand billing and TTL on the `ttl` attribute. There are no indexes: 
 | `ADMIN_SESSION#<tokenHash>` | `SESSION` | `expiresAt`, `ttl` | host sign-in |
 | `RATE#<key>#<window>` | `RATE` | `count`, `ttl` | sign-in rate limit |
 
+Guest, vote, answer and message items also carry `run`, the rehearsal run they belong to (test mode can start a new run). Only items of the run named in `STATE` are loaded; earlier runs stay stored untouched. Items written before this field existed count as run 0.
+
 The doctor's selection and the reveal code are deliberately **not** in this table. Milestone 6 puts them in a separate store, encrypted with KMS and readable only by the narrowly privileged reveal function.
 
 ## How the spec's rules map to storage

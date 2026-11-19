@@ -15,7 +15,7 @@ Every screen is a window onto the same night sky. The TV, the phones and the hos
 | `lavender` | `#B9B1C8` | Preview and informational labels. |
 | `ink` | `#2A2531` | Text on paper (doctor only). |
 
-**Gender neutrality rule:** Boy and Girl always get identical treatment (same card, same pillar, same color) and differ only in their label. No pink or blue exists in the palette. They may appear only after the reveal (Milestone 7).
+**Gender neutrality rule:** Boy and Girl always get identical treatment (same card, same pillar, same color) and differ only in their label. No pink or blue exists in the palette. They appear only from the reveal's light burst on, as soft dawn tones defined in one place (`features/reveal/palette.ts`): rose `#E7B3C1` for a girl, dusk blue `#A9C2DE` for a boy, each with a matching glow, wash and confetti set.
 
 ## Type
 

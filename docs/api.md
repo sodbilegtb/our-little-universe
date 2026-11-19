@@ -37,9 +37,10 @@ All bodies are JSON, at most 16 KB, and validated with the Zod schemas in `packa
 | `POST /v1/admin/doctor/resend` | host | | `204`. Emails the same code again |
 | `POST /v1/admin/doctor/reset` | host | `{confirm: "RESET"}` | `204`. Retires the sealed answer, its code and the link; refused once the reveal began |
 | `POST /v1/admin/doctor/simulate` | host | | `201 {code}` in TEST mode; `404` in LIVE |
+| `POST /v1/admin/rehearsal/new` | host | `{confirm: "NEW"}` | `204` in TEST mode: a new rehearsal run, back in the lobby, nothing erased; `404` in LIVE |
 | `POST /v1/doctor/session` | none | `{token}` | `200 {mode, status: READY \| SEALED}`. Read-only |
 | `POST /v1/doctor/selection` | none | `{token, choice, submissionId, confirmed: true}` | `200 {status: SEALED}`. Repeats of the same `submissionId` are harmless; another one is `409 ALREADY_SUBMITTED` |
-| `GET /v1/reveal/result` | none | | `200 {result, revealAt}` from the reveal moment on, otherwise `409`. Served by the separate reveal Lambda |
+| `GET /v1/reveal/result` | none | | `200 {result, revealAt}` from the reveal moment on (also after the evening is finished), otherwise `409`. Served by the separate reveal Lambda |
 | `POST /v1/dev/reset?seedGuests=n`, `POST /v1/dev/simulate` | host | | `204`. Local only; `404` when `DEV_ROUTES` is off |
 
 Notes on specific endpoints:
