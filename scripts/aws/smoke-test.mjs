@@ -55,13 +55,22 @@ await check('TV view', async () => {
   return `phase ${body.phase}, ${body.guestCount} guests`;
 });
 
-await check('CORS allows the web app', async () => {
-  const response = await fetch(`${api}/v1/votes`, {
-    method: 'OPTIONS',
-    headers: { origin: out.appUrl, 'access-control-request-method': 'POST', 'access-control-request-headers': 'authorization,content-type' },
+// A browser sends this preflight before every POST (joining, voting, host
+// sign-in) and only proceeds on a 2xx response that allows the method and headers.
+for (const path of ['/v1/guests', '/v1/admin/sessions']) {
+  await check(`Browsers may POST to ${path} (CORS preflight)`, async () => {
+    const response = await fetch(`${api}${path}`, {
+      method: 'OPTIONS',
+      headers: { origin: out.appUrl, 'access-control-request-method': 'POST', 'access-control-request-headers': 'authorization,content-type' },
+    });
+    expect(response.status >= 200 && response.status < 300, `preflight answered HTTP ${response.status}`);
+    expect(response.headers.get('access-control-allow-origin') === out.appUrl, 'origin not allowed');
+    const methods = (response.headers.get('access-control-allow-methods') ?? '').toUpperCase();
+    expect(methods.includes('POST'), `POST not allowed (${methods || 'no methods'})`);
+    const headers = (response.headers.get('access-control-allow-headers') ?? '').toLowerCase();
+    expect(headers.includes('content-type') && headers.includes('authorization'), `headers not allowed (${headers || 'none'})`);
   });
-  expect(response.headers.get('access-control-allow-origin') === out.appUrl, 'origin not allowed');
-});
+}
 
 await check('CORS refuses other sites', async () => {
   const response = await fetch(`${api}/v1/votes`, {
