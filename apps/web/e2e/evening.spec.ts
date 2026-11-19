@@ -62,14 +62,20 @@ test('a full evening across a guest phone, the TV and the host desk', async ({ e
   await admin.getByRole('button', { name: 'Restore' }).click();
   await expect(tv.getByText('We already love you to the moon and back.')).toBeVisible();
 
-  // Reveal: phones point at the TV; the preview never unlocks anything.
+  // Reveal: phones point at the TV; a simulated doctor (test mode) provides the code.
+  await admin.getByRole('button', { name: 'Simulate the doctor (test)' }).click();
+  const code = (await admin.getByTestId('test-code').textContent())!.trim();
+  await expect(admin.getByText('Sealed, code emailed')).toBeVisible();
   await hostAction(admin, 'Start the reveal', 'Start the reveal');
   await expect(phone.getByRole('heading', { name: "The moment we've all been waiting for..." })).toBeVisible();
   await expect(phone.getByText('Look at the big screen!')).toBeVisible();
   await expect(tv.getByRole('heading', { name: 'THE FINAL SECRET' })).toBeVisible();
-  await admin.getByLabel('Reveal code').fill('R7KM92PXL4QT');
+  await admin.getByLabel('Reveal code').fill('2222-2222-2222');
   await admin.getByRole('button', { name: 'Unlock the reveal' }).click();
-  await expect(admin.getByText('Nothing was unlocked.')).toBeVisible();
+  await expect(admin.getByText('That code doesn’t unlock the reveal. Check it and try again.')).toBeVisible();
+  await admin.getByLabel('Reveal code').fill(code.toLowerCase().replace(/-/g, ''));
+  await admin.getByRole('button', { name: 'Unlock the reveal' }).click();
+  await expect(admin.getByText('The code was accepted. The reveal is on the TV now.')).toBeVisible();
 
   await hostAction(admin, 'Finish the event', 'Finish');
   await expect(phone.getByRole('heading', { name: 'Thank you for being part of our little universe' })).toBeVisible();
