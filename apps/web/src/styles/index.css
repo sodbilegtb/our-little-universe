@@ -1,0 +1,144 @@
+@import '@fontsource-variable/fraunces/full.css';
+@import '@fontsource-variable/figtree';
+@import 'tailwindcss';
+
+/*
+ * Our Little Universe — "Dreamy Celestial" design tokens.
+ * Every colour below is gender-neutral by design. Traditional pink and blue
+ * are intentionally absent until the reveal milestone.
+ */
+@theme {
+  --color-night: #1c1922;
+  --color-night-deep: #15131a;
+  --color-plum: #302b3a;
+  --color-plum-raised: #3a3446;
+  --color-plum-line: #4a4356;
+  --color-ivory: #faf7f0;
+  --color-ivory-dim: #d9d3c7;
+  --color-mist: #a39cb0;
+  --color-champagne: #d8bd8b;
+  --color-champagne-soft: #e9d8b6;
+  --color-champagne-deep: #b89a63;
+  --color-sage: #a9b7a0;
+  --color-lavender: #b9b1c8;
+  --color-ink: #2a2531;
+  --color-paper: #faf7f0;
+  --color-paper-shade: #f1ebdf;
+  --color-danger: #e0a39a;
+
+  --font-display: 'Fraunces Variable', 'Iowan Old Style', Georgia, serif;
+  --font-sans: 'Figtree Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  --ease-drift: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-settle: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --radius-pill: 999px;
+  --radius-soft: 1.75rem;
+
+  --animate-twinkle: twinkle 4s ease-in-out infinite;
+  --animate-breathe: breathe 6s ease-in-out infinite;
+
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.35; }
+    50% { opacity: 1; }
+  }
+  @keyframes breathe {
+    0%, 100% { opacity: 0.55; transform: scale(1); }
+    50% { opacity: 0.85; transform: scale(1.06); }
+  }
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background-color: var(--color-night);
+    color: var(--color-ivory);
+    font-family: var(--font-sans);
+    font-size: 1.0625rem;
+    line-height: 1.55;
+    font-feature-settings: 'ss01';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-champagne) 40%, transparent);
+    color: var(--color-ivory);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-champagne);
+    outline-offset: 3px;
+  }
+
+  .theme-paper :focus-visible {
+    outline-color: var(--color-ink);
+  }
+
+  button {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+}
+
+@layer components {
+  /* Display type: Fraunces with the soft axis turned up, so the serifs feel rounded and gentle. */
+  .type-display {
+    font-family: var(--font-display);
+    font-variation-settings: 'SOFT' 100, 'WONK' 0, 'opsz' 144;
+    font-weight: 300;
+    letter-spacing: -0.015em;
+    line-height: 1.04;
+    text-wrap: balance;
+  }
+  .type-display-italic {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-variation-settings: 'SOFT' 100, 'WONK' 1, 'opsz' 72;
+    font-weight: 300;
+  }
+  .type-numeral {
+    font-family: var(--font-display);
+    font-variation-settings: 'SOFT' 50, 'opsz' 144;
+    font-weight: 300;
+    font-variant-numeric: lining-nums tabular-nums;
+    letter-spacing: -0.02em;
+  }
+
+  /* A hairline of starlight used for dividers and card edges. */
+  .hairline {
+    border-color: color-mix(in oklab, var(--color-ivory) 12%, transparent);
+  }
+
+  /* Frosted surface over the sky. Used sparingly: not every block is a card. */
+  .veil {
+    background: color-mix(in oklab, var(--color-plum) 55%, transparent);
+    border: 1px solid color-mix(in oklab, var(--color-ivory) 10%, transparent);
+    backdrop-filter: blur(18px) saturate(120%);
+    -webkit-backdrop-filter: blur(18px) saturate(120%);
+  }
+
+  .text-glow {
+    text-shadow: 0 0 28px color-mix(in oklab, var(--color-champagne) 35%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
