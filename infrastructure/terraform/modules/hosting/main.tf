@@ -35,26 +35,28 @@ resource "aws_amplify_app" "web" {
     status = "200"
   }
 
-  custom_headers = yamlencode({
-    customHeaders = [
-      {
-        pattern = "**"
-        headers = [
-          { key = "Content-Security-Policy", value = local.content_security_policy },
-          { key = "Strict-Transport-Security", value = "max-age=31536000; includeSubDomains" },
-          { key = "X-Content-Type-Options", value = "nosniff" },
-          { key = "X-Frame-Options", value = "DENY" },
-          { key = "Referrer-Policy", value = "no-referrer" },
-          { key = "Permissions-Policy", value = "camera=(), microphone=(), geolocation=(), payment=(), usb=()" },
-        ]
-      },
-      {
-        # Vite fingerprints asset file names, so they can be cached forever.
-        pattern = "/assets/**"
-        headers = [{ key = "Cache-Control", value = "public, max-age=31536000, immutable" }]
-      },
-    ]
-  })
+  # Amplify accepts the documented YAML (customHeaders: ...) but stores the
+  # list as JSON, so a YAML value shows up as a change in every plan. This is
+  # the stored form, which keeps plans clean. Order is irrelevant to Amplify;
+  # jsonencode sorts keys the same way Amplify returns them.
+  custom_headers = jsonencode([
+    {
+      pattern = "**"
+      headers = [
+        { key = "Content-Security-Policy", value = local.content_security_policy },
+        { key = "Strict-Transport-Security", value = "max-age=31536000; includeSubDomains" },
+        { key = "X-Content-Type-Options", value = "nosniff" },
+        { key = "X-Frame-Options", value = "DENY" },
+        { key = "Referrer-Policy", value = "no-referrer" },
+        { key = "Permissions-Policy", value = "camera=(), microphone=(), geolocation=(), payment=(), usb=()" },
+      ]
+    },
+    {
+      # Vite fingerprints asset file names, so they can be cached forever.
+      pattern = "/assets/**"
+      headers = [{ key = "Cache-Control", value = "public, max-age=31536000, immutable" }]
+    },
+  ])
 }
 
 resource "aws_amplify_branch" "main" {
