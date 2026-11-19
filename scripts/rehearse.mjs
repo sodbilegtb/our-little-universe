@@ -23,6 +23,7 @@ const { values: args } = parseArgs({
     guests: { type: 'string', default: '30' },
     poll: { type: 'string', default: '1500' },
     reset: { type: 'boolean', default: false },
+    fresh: { type: 'boolean', default: false },
     help: { type: 'boolean', short: 'h', default: false },
   },
 });
@@ -30,8 +31,9 @@ const { values: args } = parseArgs({
 if (args.help || (!args.api && !args.env)) {
   console.log(`Usage:
   ADMIN_PASSWORD=... npm run rehearse -- --api <url> [--guests 30] [--poll 1500] [--reset]
-  ADMIN_PASSWORD=... npm run rehearse -- --env dev [--guests 30]
+  ADMIN_PASSWORD=... npm run rehearse -- --env dev [--guests 30] [--fresh]
 
+  --fresh   start a new rehearsal run first (test mode; like the host desk button)
   --reset   start over first (local API only: uses the development reset route)`);
   process.exit(args.help ? 0 : 1);
 }
@@ -343,11 +345,13 @@ async function main() {
     const reset = await call('host', 'POST', '/v1/dev/reset', { auth: hostAuth });
     if (reset.status !== 204) throw new Error('Reset is only available on a local API.');
   }
+  if (args.fresh) {
+    const fresh = await call('host', 'POST', '/v1/admin/rehearsal/new', { body: { confirm: 'NEW' }, auth: hostAuth });
+    if (fresh.status !== 204) throw new Error('A new rehearsal run can only be started in test mode.');
+  }
   const start = await adminView();
   if (start.phase !== 'LOBBY' || start.voting.tally.total > 0) {
-    throw new Error(
-      `The event is already under way (phase ${start.phase}). Use a fresh event: --reset locally, or a new event_id in AWS.`,
-    );
+    throw new Error(`The event is already under way (phase ${start.phase}). Add --fresh to start a new rehearsal run first.`);
   }
   const existingGuests = start.guests.length;
   const startedAt = performance.now();
