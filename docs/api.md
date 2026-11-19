@@ -32,8 +32,14 @@ All bodies are JSON, at most 16 KB, and validated with the Zod schemas in `packa
 | `POST /v1/messages` | guest | `{clientMessageId, text}` | `204` |
 | `POST /v1/admin/sessions` | none | `{password}` | `201 {token, expiresAt}` |
 | `POST /v1/admin/commands` | host | an `AdminCommand` | `204` |
-| `POST /v1/admin/reveal-code` | host | `{code}` | `200 {accepted: false, message}` until Milestone 6 |
-| `GET /v1/doctor/links/:token`, `POST /v1/doctor/selections` | | | `501` until Milestone 6 |
+| `POST /v1/admin/reveal-code` | host | `{code}` | `200 {accepted, message, revealAt?}`. Wrong codes all get the same message; 10 attempts per 15 min per event |
+| `POST /v1/admin/doctor/link` | host | | `201 {url, expiresAt}`. The token is in the URL fragment and shown only here |
+| `POST /v1/admin/doctor/resend` | host | | `204`. Emails the same code again |
+| `POST /v1/admin/doctor/reset` | host | `{confirm: "RESET"}` | `204`. Retires the sealed answer, its code and the link; refused once the reveal began |
+| `POST /v1/admin/doctor/simulate` | host | | `201 {code}` in TEST mode; `404` in LIVE |
+| `POST /v1/doctor/session` | none | `{token}` | `200 {mode, status: READY \| SEALED}`. Read-only |
+| `POST /v1/doctor/selection` | none | `{token, choice, submissionId, confirmed: true}` | `200 {status: SEALED}`. Repeats of the same `submissionId` are harmless; another one is `409 ALREADY_SUBMITTED` |
+| `GET /v1/reveal/result` | none | | `200 {result, revealAt}` from the reveal moment on, otherwise `409`. Served by the separate reveal Lambda |
 | `POST /v1/dev/reset?seedGuests=n`, `POST /v1/dev/simulate` | host | | `204`. Local only; `404` when `DEV_ROUTES` is off |
 
 Notes on specific endpoints:
@@ -41,6 +47,7 @@ Notes on specific endpoints:
 - **`POST /v1/votes`** succeeds again if the same vote is repeated.
 - **`POST /v1/quiz/answers`** succeeds again if the same answer is repeated.
 - **`POST /v1/messages`** is deduplicated by `clientMessageId`.
+- **Doctor tokens travel in request bodies only.** Paths end up in access logs; bodies don't. See `docs/security.md` for the whole secret workflow.
 - **`SET_MESSAGE_REMOVED`** is the only way to take a message away, and it is reversible. No command erases a message, and the storage layer refuses to turn a missing message into a delete.
 
 ## Errors

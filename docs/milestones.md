@@ -165,6 +165,40 @@ The DynamoDB repository had not run against a real DynamoDB engine at the end of
 ### Not yet verified
 - The rehearsal and real-device checklist against AWS (`docs/deployment.md`, steps 8 and 9). They need Milestone 4 applied.
 
-## Milestone 6: Doctor security and email (next)
+## Milestone 6: Doctor security and email (done locally; AWS deployment pending)
 
-- Protected doctor link, secure random reveal code, encryption with KMS, SES email, test and live separation, reveal authorization.
+### Workflow
+- **Doctor link:** the host creates a one-time doctor link (shown once, with a QR code). The token is in the URL fragment and only its hash is stored. It is valid for 48 h, and a new link retires the old one.
+- **Doctor page:** checks the link read-only, then lets the doctor choose and confirm. A submission id per confirmation makes double clicks and retries harmless. Refreshing after sealing shows "Already sealed".
+- **Sealing:** the answer is encrypted with KMS at once. A random code (about 59 bits, no prefix) is encrypted with it and claimed as unique. The event records only an opaque selection id.
+- **Code email:** sent by a separate mailer Lambda via SES (subject `OFFICIAL BABY REVEAL CODE`, `[TEST]` in test mode). Failed sends are retried, and "Send the code again" always repeats the same code.
+- **Reveal code:** verified by hash bound to environment and event, matched to the current sealed answer, with 10 attempts per 15 minutes per event. Accepting it starts the reveal with a server-side `revealAt` (26 s).
+- **Result:** `GET /v1/reveal/result` is served by a separate, read-only reveal Lambda, only from `revealAt` on.
+- **Reset:** retires the answer, its code and the link (typed confirmation; impossible once the reveal began).
+- **Test and live:** set by the environment. dev and local are TEST; prod is LIVE unless explicitly set to TEST. "Simulate the doctor" exists in TEST only.
+
+### Infrastructure
+- New `secret` module: customer managed KMS key (rotation on), separate secrets table, mailer and reveal Lambdas.
+- Access is split three ways (IAM down to table attributes, plus a key policy that denies opening the answer to every role but the reveal Lambda's):
+  - the API may only encrypt;
+  - the mailer may open only codes;
+  - the reveal Lambda may open only the answer.
+- New `email` module: SES identities for the sender (address or domain with DKIM) and the recipients.
+- The reveal route goes to its own integration; the mailer and reveal Lambdas have error alarms.
+
+### Verified
+- **API (105 tests):** spec items 11 to 17 on both storage backends. Two runs, BOY and GIRL, produce byte-identical host desk, TV and guest responses, exports, emails and logs.
+- **Rules:** 9 new event-core tests.
+- **Browser:** 6 Playwright scenarios on the mock and the local API, including the doctor link, sealing, refresh, the reset and unlocking with the emailed code.
+- **Terraform:** 20 `terraform test` runs; a mutation check proves the IAM tests catch a mailer that could open the answer.
+- **Local rehearsal:** the whole secret flow passes.
+
+### Not yet verified
+- Nothing applied to AWS yet: KMS, IAM attribute conditions, SES delivery and the reveal Lambda need the dev deployment and `npm run rehearse -- --env dev`.
+
+### Security limits
+- An AWS account administrator can change policies and decrypt on purpose. The design prevents accidental and application-level exposure. A stronger option (an external key custodian with a time-locked key policy) is described in `docs/security.md`.
+
+## Milestone 7: Cinematic reveal (next)
+
+- The 30-second TV sequence, synchronized to the server's `revealAt`, the result fetched only at the reveal moment, the celebration scene, and recovery after a TV refresh.

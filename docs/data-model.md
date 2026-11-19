@@ -63,3 +63,15 @@ Warm Lambda containers cache the loaded event per revision. When nothing changed
 - **Data:** a party of 40 guests produces roughly 600 items and about 150 KB per partition query.
 - **Polling:** during the busiest moments (live voting or a quiz round), roughly 50 clients poll every 1.5s. Each changed revision costs about 40 read units per refetched view.
 - **Cost:** with on-demand pricing, the whole evening should cost cents, not dollars. Milestone 4 will measure this on the real dev table before anything is promised.
+
+## Secrets table (Milestone 6)
+
+A separate table per environment (`olu-<env>-secrets`). Ciphertexts are KMS-encrypted with an encryption context of `purpose`, `environment`, `eventId` and `selectionId`.
+
+| pk | sk | Holds | Readable by |
+|---|---|---|---|
+| `LINK#<sha256(token)>` | `LINK` | `eventId`, `linkId`, `expiresAt`, `ttl` | API |
+| `CODE#<sha256(env, event, code)>` | `CODE` | `eventId`, `selectionId` (claims the code; codes are unique) | API |
+| `EVENT#<eventId>` | `SELECTION#<id>` | `choiceCiphertext`, `codeCiphertext`, `codeHash`, `status` (ACTIVE or RETIRED), `submissionId`, `linkId`, `generation`, `createdAt`, `email*` | API: status fields only. Mailer: `codeCiphertext`, `status`, email fields. Reveal: `choiceCiphertext`, `status` |
+
+The event's `STATE` item holds only `doctor.status`, the current `linkId`, an opaque `selectionId` and the reveal times. The reveal Lambda may read that item's `data` attribute and nothing else in the events table.

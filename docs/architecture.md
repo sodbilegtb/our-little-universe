@@ -1,4 +1,4 @@
-# Architecture (Milestone 4)
+# Architecture (Milestone 6)
 
 ## Layers
 
@@ -27,7 +27,7 @@ The API returns **role-specific read models**, defined in `packages/shared/src/t
 - `TvView`: tallies, the public question, the leaderboard, message stars, and approved message text only.
 - `AdminView`: everything the host needs, including quiz answers for editing. **It never includes the doctor's selection.**
 
-No view type has a field that could carry the baby's gender. That is the first line of defense; KMS and IAM separation come in Milestone 6.
+No view type has a field that could carry the baby's gender. That is the first line of defense; KMS encryption and separate, narrowly privileged Lambdas are the second (`docs/security.md`).
 
 ## Synchronization
 
@@ -68,3 +68,14 @@ The TV page emits a `TvCue` for every scene change (`src/lib/tvCues.ts`). A late
 ## Deployment (Milestone 4)
 
 The dev environment runs the same `services/api` bundle as one Lambda behind an API Gateway HTTP API, with DynamoDB as the repository and the web app on Amplify Hosting. The host password hash is read from SSM Parameter Store at runtime, so no secret passes through Terraform. Infrastructure, decisions and costs: `infrastructure/terraform/README.md` and `docs/deployment.md`.
+
+## The secret (Milestone 6)
+
+```
+doctor ──► API Lambda ──seal (KMS Encrypt only)──► secrets table
+              │  └─ invoke (ids only) ──► mailer Lambda ──open code──► SES ──► parents
+host ──code──► API Lambda: hash, match, start reveal (revealAt)
+TV ──GET /v1/reveal/result──► reveal Lambda ──open answer, from revealAt on──► { result }
+```
+
+Three Lambdas, three roles. Details, guarantees and limits: `docs/security.md`.

@@ -113,17 +113,19 @@ docs/                      Architecture, API, data model, deployment, design sys
 
 - Terraform for the dev environment (`infrastructure/terraform`): DynamoDB, Lambda, HTTP API, Amplify Hosting, alarms and a budget. Formatted, validated and covered by `terraform test` with mocked AWS.
 
-**Built but not yet run in AWS**
-- Nothing has been applied. Follow [`docs/deployment.md`](docs/deployment.md) to plan, apply, deploy and rehearse.
-- The DynamoDB repository passes the shared contract tests on a strict DynamoDB stand-in. Step 7 of the deployment guide runs them against real DynamoDB in a temporary table.
+**Running on AWS (dev)**
+- The web app on Amplify, the API on Lambda and DynamoDB, set up with [`docs/deployment.md`](docs/deployment.md).
+- The DynamoDB contract tests pass against real DynamoDB, and the rehearsal (`npm run rehearse`) passes with 40 simulated phones.
+
+**Built and tested, not yet deployed to AWS**
+- The secret: one-time doctor link, KMS-sealed answer and code, code email via SES, verified reveal code, result released only at the reveal moment by a separate Lambda. See [`docs/security.md`](docs/security.md).
 
 **Still mock**
-- The browser-only preview (`services/api/mock`).
-- The doctor workflow and reveal code: stubs until Milestone 6.
+- The browser-only preview (`services/api/mock`), including a test-mode stand-in for the secret.
 
 **Not started (by design)**
-- The cinematic reveal sequence and result (Milestone 7). No gender value exists anywhere in this codebase.
+- The cinematic TV reveal sequence (Milestone 7). No gender value exists anywhere in this codebase; the doctor's answer only ever exists sealed.
 - Audio. The TV emits scene cues (`src/lib/tvCues.ts`) as the extension point for future TV-only music.
-- SES and KMS (Milestone 6) and the production environment (Milestone 8).
+- The production environment (Milestone 8).
 
 See [`docs/`](docs) for details.

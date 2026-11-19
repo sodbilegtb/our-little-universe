@@ -58,7 +58,13 @@ terraform plan -out=dev.tfplan
 terraform apply dev.tfplan                     # only after you have read the plan
 ```
 
-The plan creates about 20 resources: the table, the Lambda with its role and log groups, the HTTP API, the Amplify app and branch, the alarms, an SNS topic and the budget. If you set `alarm_email`, AWS sends a confirmation email; alarms only reach you after you click it.
+The plan creates about 35 resources:
+- the events table and the secrets table;
+- the KMS key;
+- three Lambdas (API, mailer, reveal) with their roles and log groups;
+- the HTTP API and its routes;
+- the Amplify app and branch;
+- SES identities, the alarms, an SNS topic and the budget. If you set `alarm_email`, AWS sends a confirmation email; alarms only reach you after you click it.
 
 Re-run `npm run aws:build-api` and `terraform apply` whenever the API code changes. Terraform notices the new bundle hash and updates the function.
 
@@ -71,6 +77,22 @@ npm run aws:set-password -- dev
 ```
 
 The script asks twice (hidden input), hashes with scrypt on your laptop, and stores only the hash as a SecureString. A running API picks up a changed password within 5 minutes. Until the parameter exists, guests can play but host sign-in answers "Host sign-in isn't configured on the server."
+
+## 4b. Reveal code email (Amazon SES)
+
+The mailer sends the reveal code through SES. Without an email configuration, dev still works: the host desk shows the email as skipped, and "Simulate the doctor (test)" shows the test code directly.
+
+1. In `environments/dev/terraform.tfvars` set:
+   ```hcl
+   email_sender     = "reveal@your-domain.example"   # or your own address
+   email_recipients = ["you@example.com"]
+   # email_sender_domain = "your-domain.example"     # optional, recommended
+   ```
+2. Plan and apply (step 3). AWS emails a verification link to every address. Click each one: until then SES refuses to send.
+3. If you set `email_sender_domain`, run `terraform output email_dkim_records` and add the three CNAME records to your domain's DNS. Mail from a verified domain is far less likely to land in spam than mail claiming to come from a Gmail address.
+4. New AWS accounts start in the **SES sandbox**. Only verified addresses can receive mail, and the limit is 200 emails a day. That's enough for this app, so you don't need production access.
+
+Test-mode emails have the subject `[TEST] OFFICIAL BABY REVEAL CODE` and say they can't unlock the real reveal. How the secret is protected is described in [`security.md`](security.md).
 
 ## 5. Publish the web app
 
@@ -117,6 +139,14 @@ It checks, from the server's own answers:
 - no message reaches the TV without approval, and removing and restoring keeps it;
 - the export holds everything and no session tokens.
 
+In TEST mode it also runs the whole secret flow with a simulated doctor:
+- the answer is sealed and the code emailed (or recorded as skipped without SES);
+- the TV view carries no answer, and a wrong code is refused;
+- the emailed code starts the reveal;
+- the result stays sealed during the countdown and is released at the reveal moment.
+
+It never prints the simulated result.
+
 It also reports latency per kind of request, the busiest request rate, and how long phones took to show each change. Locally, with 40 phones, phones showed each change after 0.5 to 0.9 seconds (median) and at most 1.8 seconds; traffic peaked at 74 requests per second, and at 175 with 100 phones. The dev API accepts 300 per second (`api_rate_limit`), enough for about 150 phones.
 
 Against a local API: `ADMIN_PASSWORD=… npm run rehearse -- --api http://localhost:8787 --reset`.
@@ -151,6 +181,8 @@ For a family party (about 30 guests, 3 hours, every phone polling every 1.5 seco
 | Amplify Hosting | 0.023 USD per GB stored and 0.15 USD per GB served, after the free tier of 5 GB stored and 15 GB served per month | usually 0 |
 | CloudWatch | Logs at 14 days retention, 3 alarms | a few cents |
 | Point-in-time recovery | Billed per GB of table data; the event is a few hundred KB | cents |
+| KMS key | 1 USD per month while it exists (billed hourly); requests are within the free tier | ~1 USD per month |
+| SES | 0.10 USD per 1,000 emails | 0 |
 
 Not free: polling never stops while a tab is open and visible. The poller pauses in hidden tabs, but a TV left on overnight keeps polling. Close tabs after rehearsals. The budget alert emails you at 50% and 100% of `monthly_budget_usd` (default 10 USD).
 
@@ -170,6 +202,7 @@ aws ssm delete-parameter --name /olu/dev/admin-password-hash   # not managed by 
 What is **not** removed by `destroy`:
 - the state bucket and its versions (bootstrap, on purpose);
 - the SSM password parameter (created by the script, see above);
+- the KMS key is not deleted at once: it is scheduled for deletion after 7 days and costs nothing meanwhile. Within those days it can be restored (`aws kms cancel-key-deletion`);
 - the confirmed SNS email subscription is removed, but AWS Budgets history is kept by AWS;
 - CloudWatch logs from log groups Lambda may recreate after destroy if a request arrives in between (rare; delete `/aws/lambda/olu-dev-api` if it reappears).
 
@@ -181,6 +214,8 @@ The table has point-in-time recovery but no deletion protection in dev. Producti
 - **The web app loads but every request fails:** run the smoke test. A CORS failure means the app URL changed; `terraform apply` again. A 401 on host actions before sign-in is expected.
 - **"Host sign-in isn't configured":** run step 4, then wait up to 30 seconds.
 - **Phones show "Reconnecting…" during busy moments at a big party:** the API rate limit may be too low. The rehearsal prints the busiest request rate; raise `api_rate_limit` and apply.
+- **AccessDenied from DynamoDB in the API, mailer or reveal logs:** each Lambda may read only specific attributes of the secrets table. If code changes which attributes it reads, the lists in `modules/secret/iam.tf` and `modules/api/iam.tf` must change with it.
+- **Code email "Failed":** usually an unverified sender or recipient (SES sandbox). Check the verification emails, then "Send the code again" on the host desk. It sends the same code.
 - **HTTP 503 "The Lambda function is being throttled" in the rehearsal or access logs:** the account's Lambda concurrency limit is too low (see Prerequisites). Leave `reserved_concurrency = -1` and request the quota increase.
 - **Finding the cause of failed requests:** the rehearsal lists each one with its request id. Search the access logs for server errors:
   ```bash

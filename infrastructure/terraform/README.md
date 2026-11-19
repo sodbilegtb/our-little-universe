@@ -7,6 +7,8 @@ modules/
   api/                Lambda (Node.js 22, arm64), least-privilege role, HTTP API, throttling, CORS, logs
   hosting/            Amplify Hosting app + branch, SPA rewrite, CSP and security headers
   monitoring/         SNS topic, Lambda/API alarms, optional monthly budget
+  secret/             KMS key, secrets table, mailer and reveal Lambdas (see docs/security.md)
+  email/              SES identities for the reveal code email
 environments/
   dev/                The dev stack (state key dev/terraform.tfstate)
   prod/               Milestone 8
@@ -38,6 +40,7 @@ Every module and the dev environment have `terraform test` suites in `tests/` th
 - The web app sends a strict CSP, HSTS and `frame-ancestors 'none'`, and deep links serve `index.html`.
 - Alarms and the budget are wired, and nothing sends email when no address is configured.
 - The state bucket is versioned, private and refuses plain HTTP.
+- The API can't decrypt anything or read a ciphertext. The mailer can open only codes and can't read the answer. The reveal Lambda can open only the answer and writes nothing. The key policy denies opening the answer to every role but the reveal Lambda's.
 
 ## Configuration
 
@@ -56,4 +59,4 @@ Secrets never go through Terraform: the host password hash is written to SSM by 
 - **Amplify Hosting** (the spec default) with manual zip deployments, so no Git connection or build pipeline in AWS is needed. Teardown removes the app with `destroy`.
 - **HTTP API**, not REST API: cheaper, simpler, enough for this app.
 - **CSP `connect-src`** allows `https://*.execute-api.<region>.amazonaws.com` rather than the exact API URL. The exact URL would make hosting depend on the API while the API's CORS depends on the hosting URL, a cycle. CORS on the API remains exact.
-- **One Lambda** for all routes keeps cold starts rare at party scale. Milestone 6 adds a separate, narrowly privileged reveal function.
+- **One API Lambda** for all regular routes keeps cold starts rare at party scale. The secret has two more, narrowly privileged Lambdas (mailer, reveal), each with its own role.
