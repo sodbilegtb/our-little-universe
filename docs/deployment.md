@@ -89,7 +89,11 @@ The mailer sends the reveal code through SES. Without an email configuration, de
    # email_sender_domain = "your-domain.example"     # optional, recommended
    ```
 2. Plan and apply (step 3). AWS emails a verification link to every address. Click each one: until then SES refuses to send.
-3. If you set `email_sender_domain`, run `terraform output email_dkim_records` and add the three CNAME records to your domain's DNS. Mail from a verified domain is far less likely to land in spam than mail claiming to come from a Gmail address.
+3. If you set `email_sender_domain`, the domain needs three DKIM CNAME records. Mail from a verified domain is far less likely to land in spam than mail claiming to come from a Gmail address.
+   - **DNS in Route 53 in the same AWS account** (`dig +short NS your-domain.example` shows `awsdns` servers): set `email_dns_in_route53 = true` and Terraform writes the records itself.
+   - **DNS anywhere else:** run `terraform output email_dkim_records` and add the three records at your DNS provider. Most providers append the domain, so enter only the part before it (`xxxx._domainkey`). On Cloudflare, use "DNS only".
+
+   SES then checks the records on its own, usually within 30 minutes. `aws sesv2 get-email-identity --email-identity your-domain.example --query VerifiedForSendingStatus` turns `true` when it's done.
 4. New AWS accounts start in the **SES sandbox**. Only verified addresses can receive mail, and the limit is 200 emails a day. That's enough for this app, so you don't need production access.
 
 Test-mode emails have the subject `[TEST] OFFICIAL BABY REVEAL CODE` and say they can't unlock the real reveal. How the secret is protected is described in [`security.md`](security.md).
