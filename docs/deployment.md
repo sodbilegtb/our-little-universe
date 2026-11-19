@@ -242,6 +242,20 @@ The table has point-in-time recovery but no deletion protection in dev. Producti
 
 ## Troubleshooting
 
-**Creating the Amplify app fails with "Invalid spec, yaml parsing error: top level must be key value pairs".** Fixed in the hosting module: new apps get the documented `customHeaders:` spec. Run `git pull`, then plan and apply again; the resources created before the error stay and are not created twice.
-
-**Changing the security headers of an existing app.** Amplify stores the headers in a different form than it accepts, so the hosting module ignores later changes to them (otherwise every plan would show one). To apply a new header set: comment out `ignore_changes = [custom_headers]` in `modules/hosting/main.tf`, plan (one change to the app), apply, and put the line back.
+- **`terraform init` fails on the backend:** the bucket name in `backend.hcl` must match the bootstrap output, and the region must match the bucket's region.
+- **The web app loads but every request fails:** run the smoke test. A CORS failure means the app URL changed; `terraform apply` again. A 401 on host actions before sign-in is expected.
+- **"Host sign-in isn't configured":** run step 4, then wait up to 30 seconds.
+- **Phones show "Reconnecting…" during busy moments at a big party:** the API rate limit may be too low. The rehearsal prints the busiest request rate; raise `api_rate_limit` and apply.
+- **AccessDenied from DynamoDB in the API, mailer or reveal logs:** each Lambda may read only specific attributes of the secrets table. If code changes which attributes it reads, the lists in `modules/secret/iam.tf` and `modules/api/iam.tf` must change with it.
+- **Code email "Failed":** usually an unverified sender or recipient (SES sandbox). Check the verification emails, then "Send the code again" on the host desk. It sends the same code.
+- **HTTP 503 "The Lambda function is being throttled" in the rehearsal or access logs:** the account's Lambda concurrency limit is too low (see Prerequisites). Leave `reserved_concurrency = -1` and request the quota increase.
+- **Finding the cause of failed requests:** the rehearsal lists each one with its request id. Search the access logs for server errors:
+  ```bash
+  START=$(( ($(date +%s) - 7200) * 1000 ))
+  aws logs filter-log-events --log-group-name /aws/apigateway/olu-dev-api --start-time $START \
+    --filter-pattern '{ $.status = "5*" }' --query 'events[].message' --output text
+  ```
+- **No alarm emails:** confirm the SNS subscription email.
+- **Amplify shows the old version:** check the job in the Amplify console; the deploy script exits non-zero if a deployment fails.
+- **Creating the Amplify app fails with "Invalid spec, yaml parsing error: top level must be key value pairs":** fixed in the hosting module, which now writes the documented YAML spec (a top-level `customHeaders` key). Pull, then plan and apply again; what was created before the error stays and isn't created twice.
+- **Changing the security headers of an existing app:** Amplify stores the headers in another form than it accepts, so the hosting module ignores later changes to them (otherwise every plan would show one). To apply new headers, comment out `ignore_changes = [custom_headers]` in `modules/hosting/main.tf`, plan (one change to the app), apply, and put the line back.
