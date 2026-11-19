@@ -1,0 +1,3 @@
+# Copy to backend.hcl and use: terraform init -backend-config=backend.hcl
+bucket = "olu-tfstate-123456789012" # output "state_bucket" of the bootstrap
+region = "eu-central-1"

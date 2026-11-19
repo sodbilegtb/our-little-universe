@@ -1,0 +1,32 @@
+output "app_url" {
+  description = "Open this on the TV (/tv) and the host laptop (/admin)."
+  value       = module.hosting.url
+}
+
+output "api_endpoint" {
+  value = module.api.api_endpoint
+}
+
+output "amplify_app_id" {
+  value = module.hosting.app_id
+}
+
+output "amplify_branch" {
+  value = module.hosting.branch_name
+}
+
+output "table_name" {
+  value = module.database.table_name
+}
+
+output "lambda_log_group" {
+  value = module.api.lambda_log_group
+}
+
+output "admin_password_parameter" {
+  value = "/olu/${local.environment}/admin-password-hash"
+}
+
+output "region" {
+  value = var.region
+}
