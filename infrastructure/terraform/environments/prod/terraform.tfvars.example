@@ -1,0 +1,29 @@
+# Production: copy to terraform.tfvars (never committed) and fill in.
+
+region = "eu-central-1"
+
+# "TEST" for the dress rehearsal on this stack, "LIVE" for the party. No default:
+# going live is a line you change on purpose, then plan, read and apply.
+reveal_mode = "TEST"
+
+# A fresh event id for the party. When you switch from the TEST dress rehearsal
+# to LIVE, change it too (e.g. "dress-rehearsal" -> "baby-reveal"), so no data
+# or code from the rehearsal belongs to the party.
+event_id = "dress-rehearsal"
+
+alarm_email  = "you@example.com"
+budget_email = "you@example.com"
+monthly_budget_usd = 20
+
+# The official code email. The sender domain and the recipients are the SES
+# identities dev already verified in this account; prod reuses them.
+email_sender        = "reveal@example.com"
+email_sender_domain = "example.com"
+email_recipients    = ["you@example.com"]
+
+# Fallback if SES ever fails: a Gmail account with an app password.
+# email_transport = "gmail"
+# email_sender    = "sender@gmail.com"
+
+# Create the doctor link shortly before the appointment; it is valid this long.
+# doctor_link_hours = 48

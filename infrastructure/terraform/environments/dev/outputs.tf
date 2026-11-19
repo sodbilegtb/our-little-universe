@@ -39,3 +39,24 @@ output "email_dkim_records" {
 output "secrets_table_name" {
   value = module.secret.secrets_table_name
 }
+
+output "email_identities" {
+  description = "SES identities the code email depends on (checked by npm run aws:preflight)."
+  value       = compact(concat([var.email_sender_domain != "" ? var.email_sender_domain : var.email_sender], var.email_recipients))
+}
+
+output "email_transport" {
+  value = var.email_transport
+}
+
+output "alarm_topic_arn" {
+  value = module.monitoring.alarm_topic_arn
+}
+
+output "reveal_mode" {
+  value = "TEST"
+}
+
+output "event_id" {
+  value = var.event_id
+}

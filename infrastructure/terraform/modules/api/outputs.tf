@@ -26,3 +26,12 @@ output "throttling" {
     burst = aws_apigatewayv2_stage.default.default_route_settings[0].throttling_burst_limit
   }
 }
+
+output "lambda_environment" {
+  description = "The API Lambda's configuration (names and modes, no secrets), for checks."
+  value       = aws_lambda_function.api.environment[0].variables
+}
+
+output "allowed_origins" {
+  value = aws_apigatewayv2_api.http.cors_configuration[0].allow_origins
+}
