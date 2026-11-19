@@ -125,3 +125,16 @@ run "needs_a_recipient_for_the_official_code" {
 
   expect_failures = [var.email_recipients]
 }
+
+run "deletion_protection_comes_off_only_on_purpose" {
+  command = apply
+
+  variables {
+    allow_destroy = true
+  }
+
+  assert {
+    condition     = !module.database.deletion_protection && !module.secret.deletion_protection
+    error_message = "allow_destroy turns the protection off, for the teardown after the party."
+  }
+}

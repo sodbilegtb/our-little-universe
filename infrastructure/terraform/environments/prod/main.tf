@@ -4,7 +4,8 @@
 # Differences from dev, all on purpose:
 # - reveal_mode has no default: LIVE (or TEST for a dress rehearsal) is written
 #   down in terraform.tfvars, so test never turns into live by accident.
-# - The tables refuse deletion and keep point-in-time recovery; the KMS key
+# - The tables refuse deletion (until allow_destroy, after the party) and keep
+#   point-in-time recovery; the KMS key
 #   waits 30 days before it can be deleted; logs are kept 30 days.
 # - SES identities are reused from dev (same AWS account), not created again.
 
@@ -20,7 +21,7 @@ module "database" {
 
   table_name             = "${local.name}-events"
   point_in_time_recovery = true
-  deletion_protection    = true
+  deletion_protection    = !var.allow_destroy
 }
 
 module "hosting" {
@@ -63,7 +64,7 @@ module "secret" {
   email_transport          = var.email_transport
   ses_identity_arns        = module.email.identity_arns
   point_in_time_recovery   = true
-  deletion_protection      = true
+  deletion_protection      = !var.allow_destroy
   kms_deletion_window_days = 30
   log_retention_days       = 30
   # Written by `npm run aws:set-gmail-password -- prod`, never by Terraform (it would land in the state).

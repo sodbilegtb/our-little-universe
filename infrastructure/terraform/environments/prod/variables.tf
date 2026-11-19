@@ -120,3 +120,9 @@ variable "email_dns_in_route53" {
   type        = bool
   default     = false
 }
+
+variable "allow_destroy" {
+  description = "After the party, once `npm run aws:teardown-check -- prod` passes: turns off the tables' deletion protection so terraform destroy can remove them."
+  type        = bool
+  default     = false
+}
