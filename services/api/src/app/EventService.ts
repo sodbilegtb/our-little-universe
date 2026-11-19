@@ -167,14 +167,24 @@ export class EventService {
     this.logger.info('event created', { eventId: this.eventId });
   }
 
+  /**
+   * Loads the whole event. A DynamoDB query is not a snapshot: a guest's write
+   * landing while it runs can be half visible (the new activity counter, but
+   * not yet the answer behind it). So what was read is labelled with the
+   * revision from before the read. That label can only be too low, which costs
+   * a client one extra fetch; it can never let a stale view pass as current.
+   */
   private async loadFresh(): Promise<EventSnapshot> {
+    const before = await this.repository.readRevision(this.eventId);
     let snapshot = await this.repository.load(this.eventId);
     if (!snapshot) {
       await this.ensureEvent();
       snapshot = await this.repository.load(this.eventId);
     }
     if (!snapshot) throw new AppError('NOT_AVAILABLE', 'The event could not be created.', 503);
-    this.cache = { revision: combinedRevision(snapshot), snapshot };
+    const revision = before ? Math.min(combinedRevision(before), combinedRevision(snapshot)) : combinedRevision(snapshot);
+    snapshot.state.revision = revision; // what every view reports; never part of a write
+    this.cache = { revision, snapshot };
     return snapshot;
   }
 

@@ -164,6 +164,25 @@ describe.each(backends)('event service on $name', ({ create }) => {
     expect(load).toHaveBeenCalledTimes(1);
   });
 
+  it('never lets a half-visible write pass as the current view', async () => {
+    // A DynamoDB query can see a guest's new activity counter before the vote
+    // behind it. Here Ben votes while Mia's view is being loaded.
+    const mia = await service.registerGuest({ displayName: 'Mia' });
+    const ben = await service.registerGuest({ displayName: 'Ben' });
+    await command('START_VOTING');
+    const load = repository.load.bind(repository);
+    vi.spyOn(repository, 'load').mockImplementationOnce(async (eventId) => {
+      const read = (await load(eventId))!;
+      await service.castVote(cred(ben), { choice: 'BOY' });
+      return { ...read, activityVersion: read.activityVersion + 1 }; // the counter, but not the vote
+    });
+    const torn = await service.guestView(cred(mia));
+    expect(torn.voting.myVote).toBeNull();
+    const revision = await service.revision();
+    expect(torn.revision).toBeLessThan(revision); // so every client fetches again
+    expect((await service.guestView(cred(ben))).voting.myVote).toBe('BOY');
+  });
+
   it('signs the host in, expires the session, and rate-limits guessing', async () => {
     expect(await codeOf(service.adminSignIn('wrong password', '10.0.0.1'))).toBe('UNAUTHORIZED');
     const { token } = await service.adminSignIn('host password 123', '10.0.0.1');
