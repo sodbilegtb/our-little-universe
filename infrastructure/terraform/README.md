@@ -8,13 +8,14 @@ modules/
   hosting/            Amplify Hosting app + branch, SPA rewrite, CSP and security headers
   monitoring/         SNS topic, Lambda/API alarms, optional monthly budget
   secret/             KMS key, secrets table, mailer and reveal Lambdas (see docs/security.md)
-  email/              SES identities for the reveal code email
+  email/              SES identities for the reveal code email (created by dev, reused by prod)
 environments/
   dev/                The dev stack (state key dev/terraform.tfstate)
-  prod/               Milestone 8
+  prod/               The party (state key prod/terraform.tfstate): reveal_mode without default,
+                      deletion protection, 30-day key window; see docs/production.md
 ```
 
-Step-by-step instructions, costs and teardown are in [`docs/deployment.md`](../../docs/deployment.md).
+Step-by-step instructions, costs and teardown are in [`docs/deployment.md`](../../docs/deployment.md) (dev) and [`docs/production.md`](../../docs/production.md) (prod).
 
 ## Commands
 
@@ -30,7 +31,7 @@ terraform plan -destroy                      # review before any destroy
 
 ## Tests
 
-Every module and the dev environment have `terraform test` suites in `tests/` that run against mocked providers, so they need no AWS credentials and create nothing. They check what matters for this project:
+Every module and both environments have `terraform test` suites in `tests/` that run against mocked providers, so they need no AWS credentials and create nothing. They check what matters for this project:
 
 - DynamoDB is on-demand with TTL and point-in-time recovery.
 - The Lambda runs Node.js 22 on arm64, uses DynamoDB, and has no password hash or development routes in its configuration.
@@ -60,3 +61,4 @@ Secrets never go through Terraform: the host password hash is written to SSM by 
 - **HTTP API**, not REST API: cheaper, simpler, enough for this app.
 - **CSP `connect-src`** allows `https://*.execute-api.<region>.amazonaws.com` rather than the exact API URL. The exact URL would make hosting depend on the API while the API's CORS depends on the hosting URL, a cycle. CORS on the API remains exact.
 - **One API Lambda** for all regular routes keeps cold starts rare at party scale. The secret has two more, narrowly privileged Lambdas (mailer, reveal), each with its own role.
+- Prod: the mode written in tfvars reaches every Lambda, `live` or an empty alarm email or recipient list are refused, tables refuse deletion, SES identities are reused rather than created, and only the production web app may call the API.

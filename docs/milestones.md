@@ -232,3 +232,27 @@ About 30 seconds on the TV, laid out around the server's `revealAt` (R), see `ap
 
 ### Not yet verified
 - On AWS and on the real TV (`docs/deployment.md`, step 9).
+
+## Milestone 8: Production preparation (ready; deploying it is up to you)
+
+### Production stack
+- `environments/prod`: the same modules with their own state, tables, KMS key, Lambdas, Amplify app and host password.
+- `reveal_mode` has no default and accepts only `TEST` (dress rehearsal) or `LIVE`; `event_id` is required too. Going live is a written change that shows in the plan.
+- Both tables refuse deletion and keep point-in-time recovery; the KMS key waits 30 days; logs are kept 30 days; alarms and budget emails are required.
+- The SES identities are reused from dev (same account) instead of created twice; the plan fails if one isn't verified. The email module gained `manage_identities` for this.
+- Only the production web app may call the production API.
+
+### Tools
+- `npm run aws:preflight -- <env>`: read-only go/no-go (mode and event, API and web app, host password, email path and verified identities, Lambda concurrency, alarm subscription, and with `ADMIN_PASSWORD` the doctor's status).
+- `aws:deploy-web -- prod` shows mode and event and asks for a typed confirmation; `SMOKE_WRITE` and the rehearsal tool refuse prod.
+
+### Reviews
+- Security: [`security-review.md`](security-review.md).
+- Costs and the runbook for the dress rehearsal, the switch to LIVE, the doctor and the evening: [`production.md`](production.md).
+
+### Verified
+- `terraform test` for prod (mode reaches every Lambda, `live` and missing alarm or recipient refused, deletion protection, reused identities, CORS) with mutation checks; email module tests for reused and unverified identities; a config test that only prod can be LIVE.
+- `aws:preflight` against stand-ins for the AWS CLI and Terraform plus the local API.
+
+### Not yet done (yours to decide and run)
+- `terraform apply` for prod, the dress rehearsal on real devices, the switch to LIVE, and the doctor's visit.

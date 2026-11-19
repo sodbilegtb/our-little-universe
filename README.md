@@ -118,6 +118,11 @@ docs/                      Architecture, API, data model, deployment, design sys
 - The DynamoDB contract tests pass against real DynamoDB, and the rehearsal (`npm run rehearse`) passes with simulated phones.
 - The secret: one-time doctor link, KMS-sealed answer and code, code email via SES (or Gmail), verified reveal code, result released only at the reveal moment by a separate Lambda. See [`docs/security.md`](docs/security.md).
 
+**Ready to deploy: production (Milestone 8)**
+- `infrastructure/terraform/environments/prod`: its own stack, `reveal_mode` written down (TEST for a dress rehearsal, LIVE for the party), protected data, reused SES identities.
+- `npm run aws:preflight -- prod`: one read-only go/no-go check before the evening.
+- The runbook for the evening, the doctor and the switch to LIVE: [`docs/production.md`](docs/production.md). The security review: [`docs/security-review.md`](docs/security-review.md).
+
 **Built and tested, not yet deployed to AWS**
 - The cinematic TV reveal (Milestone 7): about 30 seconds on the server clock, the result requested only at the reveal moment, the celebration, and recovery after a TV refresh. See [`docs/milestones.md`](docs/milestones.md).
 - "Start a new rehearsal" (test mode only): back to the lobby without a new event id, nothing erased.
@@ -127,6 +132,5 @@ docs/                      Architecture, API, data model, deployment, design sys
 
 **Not started (by design)**
 - Audio. The TV emits scene and reveal-stage cues (`src/lib/tvCues.ts`) as the extension point for future TV-only music.
-- The production environment (Milestone 8).
 
 See [`docs/`](docs) for details.

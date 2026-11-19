@@ -138,6 +138,8 @@ ADMIN_PASSWORD='…' SMOKE_WRITE=1 npm run aws:smoke -- dev   # also sign-in and
 
 It checks health, the TV view and its join URL, CORS (the app allowed, other sites refused), that host actions need sign-in, that development routes are off, and that the web app serves `/party` with its Content-Security-Policy. `SMOKE_WRITE=1` adds a guest named "Smoke test" to the event. The preview reset tools are disabled in AWS; to start over in test mode, use "Start a new rehearsal" on the host desk.
 
+`npm run aws:preflight -- dev` (with `ADMIN_PASSWORD` for the evening's state) is a read-only go/no-go over the whole setup: email identities, host password, Lambda concurrency limit, alarm subscription and the doctor's status. Production uses it the same way (`docs/production.md`).
+
 ## 7. Run the DynamoDB contract tests against real DynamoDB
 
 This closes the gap left in Milestone 3. The tests create their **own temporary table** (`olu-contract-<timestamp>`), run the same contract as the in-memory and fake repositories, and delete the table afterwards. They never touch `olu-dev-events`.
@@ -220,7 +222,7 @@ Prices: [API Gateway](https://aws.amazon.com/api-gateway/pricing/), [Lambda](htt
 
 ## 11. Tear down dev
 
-Dev holds only rehearsal data, but export anything you want to keep first (host desk → Keep the evening).
+Dev holds only rehearsal data, but export anything you want to keep first (host desk → Keep the evening). **Production reuses dev's SES identities: tear down prod first** (`docs/production.md`).
 
 ```bash
 cd infrastructure/terraform/environments/dev
@@ -236,7 +238,7 @@ What is **not** removed by `destroy`:
 - the confirmed SNS email subscription is removed, but AWS Budgets history is kept by AWS;
 - CloudWatch logs from log groups Lambda may recreate after destroy if a request arrives in between (rare; delete `/aws/lambda/olu-dev-api` if it reappears).
 
-The table has point-in-time recovery but no deletion protection in dev. Production (Milestone 8) turns deletion protection on, so destroying prod is a deliberate two-step change.
+The table has point-in-time recovery but no deletion protection in dev. Production turns deletion protection on, so destroying prod is a deliberate two-step change (Milestone 9).
 
 ## Troubleshooting
 
