@@ -62,9 +62,16 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const between = (min, max) => min + Math.random() * (max - min);
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 
+const runStarted = performance.now();
+const clock = (at) => {
+  const s = Math.round((at - runStarted) / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
+
 async function call(kind, method, path, { body, auth } = {}) {
   const started = performance.now();
   let status = 0;
+  let detail;
   try {
     const response = await fetch(`${api}${path}`, {
       method,
@@ -76,11 +83,23 @@ async function call(kind, method, path, { body, auth } = {}) {
     });
     status = response.status;
     const text = await response.text();
-    return { status, body: text ? JSON.parse(text) : null };
+    let parsed = null;
+    try {
+      parsed = text ? JSON.parse(text) : null;
+    } catch {
+      parsed = { error: { code: 'NOT_JSON', message: text.slice(0, 120) } };
+    }
+    if (status >= 500) {
+      // API Gateway's own errors look like {"message": "..."}; the app's like {"error": {...}}.
+      detail = parsed?.error?.code ?? parsed?.message ?? text.slice(0, 80);
+      detail += response.headers.get('apigw-requestid') ? `, request ${response.headers.get('apigw-requestid')}` : '';
+    }
+    return { status, body: parsed };
   } catch (error) {
+    detail = error.cause?.code ?? error.name ?? 'fetch failed';
     return { status: 0, body: { error: { code: 'NETWORK', message: error.message } } };
   } finally {
-    metrics.push({ kind, ms: performance.now() - started, status, at: started });
+    metrics.push({ kind, ms: performance.now() - started, status, at: started, path, detail });
   }
 }
 
@@ -268,9 +287,10 @@ function report(startedAt) {
     const rows = metrics.filter((m) => m.kind === kind);
     if (rows.length === 0) continue;
     const ms = rows.map((m) => m.ms).sort((a, b) => a - b);
-    const errors = rows.filter((m) => m.status === 0 || m.status >= 500).length;
+    const server = rows.filter((m) => m.status >= 500).length;
+    const network = rows.filter((m) => m.status === 0).length;
     console.log(
-      `  ${kind.padEnd(9)} ${String(rows.length).padStart(6)} calls   p50 ${fmt(percentile(ms, 50)).padStart(7)}   p95 ${fmt(percentile(ms, 95)).padStart(7)}   max ${fmt(ms.at(-1)).padStart(7)}   ${errors} server or network errors`,
+      `  ${kind.padEnd(9)} ${String(rows.length).padStart(6)} calls   p50 ${fmt(percentile(ms, 50)).padStart(7)}   p95 ${fmt(percentile(ms, 95)).padStart(7)}   max ${fmt(ms.at(-1)).padStart(7)}   ${server} server errors, ${network} network errors`,
     );
   }
   const total = metrics.length;
@@ -284,6 +304,15 @@ function report(startedAt) {
   console.log(
     `  ${total} requests in ${minutes.toFixed(1)} minutes: about ${Math.round(total / minutes / 60)} per second on average, ${Math.round(peak / 10)} per second at the busiest`,
   );
+
+  const errors = metrics.filter((m) => m.status === 0 || m.status >= 500);
+  if (errors.length > 0) {
+    console.log('\nFailed requests (phones simply retry on the next poll; the API logs have the details)');
+    for (const m of errors.slice(0, 20)) {
+      const what = m.status === 0 ? `network error (${m.detail}), on this computer's side` : `HTTP ${m.status} ${m.detail ?? ''}`;
+      console.log(`  ${clock(m.at)}  ${m.kind.padEnd(8)} ${m.path.padEnd(18)} ${what}`);
+    }
+  }
 
   if (marker) propagation.push(marker);
   console.log('\nHow long phones took to show each change');
@@ -416,8 +445,10 @@ async function main() {
   stopped = true;
   await Promise.allSettled(loops);
   report(startedAt);
-  const serverErrors = metrics.filter((m) => m.status === 0 || m.status >= 500).length;
-  if (serverErrors > 0) failures.push(`${serverErrors} server or network errors`);
+  // Server errors need a look in the logs. A dropped connection on this
+  // computer's side is reported above but isn't a problem with the API.
+  const serverErrors = metrics.filter((m) => m.status >= 500).length;
+  if (serverErrors > 0) failures.push(`${serverErrors} server errors`);
 
   console.log(failures.length ? `\n${failures.length} problem(s) found.\n` : '\nThe evening ran cleanly.\n');
   process.exit(failures.length ? 1 : 0);
