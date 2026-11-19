@@ -23,6 +23,7 @@
     "test:e2e:api": "npm run test:e2e:api -w @olu/web",
     "aws:build-api": "npm run build -w @olu/api",
     "aws:set-password": "npm run set-password -w @olu/api --",
+    "aws:set-gmail-password": "npm run set-gmail-password -w @olu/api --",
     "aws:deploy-web": "node scripts/aws/deploy-web.mjs",
     "aws:smoke": "node scripts/aws/smoke-test.mjs",
     "rehearse": "node scripts/rehearse.mjs"

@@ -12,7 +12,8 @@
     "test": "vitest run",
     "test:dynamodb": "vitest run src/repositories/repository.contract.test.ts",
     "hash-password": "tsx src/scripts/hashPassword.ts",
-    "set-password": "tsx src/scripts/setAdminPassword.ts"
+    "set-password": "tsx src/scripts/setAdminPassword.ts",
+    "set-gmail-password": "tsx src/scripts/setGmailAppPassword.ts"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1172.0",
