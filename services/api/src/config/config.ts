@@ -26,6 +26,23 @@ const schema = z
     PUBLIC_APP_URL: z.url().optional(),
     /** Local development only: reset and simulate endpoints. */
     DEV_ROUTES: z.enum(['true', 'false']).default('false'),
+    /**
+     * TEST everywhere except prod. Prod defaults to LIVE and can only be set to
+     * TEST explicitly (a rehearsal); dev and local can never be LIVE.
+     */
+    REVEAL_MODE: z.enum(['TEST', 'LIVE']).optional(),
+    /** Separate table for sealed answers, codes and doctor links. */
+    SECRETS_TABLE_NAME: z.string().min(3).optional(),
+    /** Customer managed KMS key; the API may only encrypt with it. */
+    KMS_KEY_ARN: z.string().startsWith('arn:aws:kms:').optional(),
+    /** The Lambda that emails the reveal code (invoked asynchronously). */
+    MAILER_FUNCTION_NAME: z.string().min(1).optional(),
+    DOCTOR_LINK_HOURS: z.coerce.number().min(1).max(168).default(48),
+    /** From the host entering the code to the moment the result may be shown. */
+    REVEAL_DELAY_SECONDS: z.coerce.number().min(5).max(120).default(26),
+    /** Mailer only. */
+    EMAIL_SENDER: z.email().optional(),
+    EMAIL_RECIPIENTS: z.string().optional(),
     LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   })
   .superRefine((env, ctx) => {
@@ -37,6 +54,22 @@ const schema = z
     }
     if (env.ENVIRONMENT !== 'local' && env.REPOSITORY === 'memory') {
       ctx.addIssue({ code: 'custom', message: 'Deployed environments must use DynamoDB', path: ['REPOSITORY'] });
+    }
+    if (env.ENVIRONMENT !== 'prod' && env.REVEAL_MODE === 'LIVE') {
+      ctx.addIssue({ code: 'custom', message: 'Only prod can run a live reveal', path: ['REVEAL_MODE'] });
+    }
+    if (env.ENVIRONMENT !== 'local' && (!env.SECRETS_TABLE_NAME || !env.KMS_KEY_ARN || !env.MAILER_FUNCTION_NAME)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Deployed environments need SECRETS_TABLE_NAME, KMS_KEY_ARN and MAILER_FUNCTION_NAME',
+        path: ['SECRETS_TABLE_NAME'],
+      });
+    }
+    const recipients = (env.EMAIL_RECIPIENTS ?? '').split(',').map((r) => r.trim()).filter(Boolean);
+    for (const recipient of recipients) {
+      if (!z.email().safeParse(recipient).success) {
+        ctx.addIssue({ code: 'custom', message: `Not an email address: ${recipient}`, path: ['EMAIL_RECIPIENTS'] });
+      }
     }
   });
 
@@ -56,6 +89,16 @@ export interface AppConfig {
   joinUrl: string;
   devRoutes: boolean;
   logLevel: RawConfig['LOG_LEVEL'];
+  /** Base URL of the web app (doctor links are built from it). */
+  appUrl: string;
+  revealMode: 'TEST' | 'LIVE';
+  secretsTableName: string | undefined;
+  kmsKeyArn: string | undefined;
+  mailerFunctionName: string | undefined;
+  doctorLinkMs: number;
+  revealDelayMs: number;
+  emailSender: string | undefined;
+  emailRecipients: string[];
 }
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): AppConfig {
@@ -79,5 +122,14 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     joinUrl: c.PUBLIC_APP_URL ? `${c.PUBLIC_APP_URL.replace(/\/$/, '')}/party` : '',
     devRoutes: c.DEV_ROUTES === 'true',
     logLevel: c.LOG_LEVEL,
+    appUrl: c.PUBLIC_APP_URL ? c.PUBLIC_APP_URL.replace(/\/$/, '') : '',
+    revealMode: c.REVEAL_MODE ?? (c.ENVIRONMENT === 'prod' ? 'LIVE' : 'TEST'),
+    secretsTableName: c.SECRETS_TABLE_NAME,
+    kmsKeyArn: c.KMS_KEY_ARN,
+    mailerFunctionName: c.MAILER_FUNCTION_NAME,
+    doctorLinkMs: c.DOCTOR_LINK_HOURS * 60 * 60 * 1000,
+    revealDelayMs: c.REVEAL_DELAY_SECONDS * 1000,
+    emailSender: c.EMAIL_SENDER,
+    emailRecipients: (c.EMAIL_RECIPIENTS ?? '').split(',').map((r) => r.trim()).filter(Boolean),
   };
 }
