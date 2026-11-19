@@ -175,7 +175,9 @@ class Guest {
       if (rev.status === 200 && rev.body.revision !== this.revision) {
         const view = await call('view', 'GET', '/v1/views/guest', { auth: this.auth });
         if (view.status === 200) {
-          this.revision = rev.body.revision;
+          // Like the app: trust the revision the view was built from, so a view
+          // that is behind gets fetched again on the next poll.
+          this.revision = Math.min(rev.body.revision, view.body.revision);
           this.observe(view.body);
         }
       }
@@ -265,8 +267,8 @@ async function tvLoop() {
   while (!stopped) {
     const rev = await call('revision', 'GET', '/v1/revision');
     if (rev.status === 200 && rev.body.revision !== revision) {
-      revision = rev.body.revision;
-      await call('view', 'GET', '/v1/views/tv');
+      const view = await call('view', 'GET', '/v1/views/tv');
+      if (view.status === 200) revision = Math.min(rev.body.revision, view.body.revision);
     }
     await sleep(POLL_MS * between(0.8, 1.2));
   }

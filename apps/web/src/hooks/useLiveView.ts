@@ -39,6 +39,7 @@ export function useLiveView<T extends BaseEventView>(
       .then((next) => {
         if (id !== request.current) return;
         recordServerTime(next.serverTime);
+        poller.current?.viewArrived(next.revision);
         setError(null);
         setData((previous) => (previous && previous.revision > next.revision ? previous : next));
       })

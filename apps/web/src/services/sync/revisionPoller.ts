@@ -44,6 +44,12 @@ export const browserEnvironment = (): PollerEnvironment => ({
 export interface RevisionPoller {
   /** Poll right now, e.g. after a push hint or a local action. */
   poke: () => void;
+  /**
+   * Reports the revision of the view that actually arrived. When it is older
+   * than the revision that triggered the fetch, the next poll fetches again
+   * instead of trusting a view that is behind.
+   */
+  viewArrived: (revision: number) => void;
   stop: () => void;
 }
 
@@ -140,6 +146,9 @@ export function createRevisionPoller(options: RevisionPollerOptions): RevisionPo
 
   return {
     poke,
+    viewArrived: (revision) => {
+      if (lastRevision !== null && revision < lastRevision) lastRevision = revision;
+    },
     stop: () => {
       stopped = true;
       env.clearTimeout(timer);

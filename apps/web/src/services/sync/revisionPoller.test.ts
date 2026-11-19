@@ -71,6 +71,24 @@ describe('revision poller', () => {
     poller.stop();
   });
 
+  it('fetches again when the view that arrived is behind the revision', async () => {
+    const fake = fakeEnvironment();
+    const onChange = vi.fn();
+    const poller = createRevisionPoller({ fetchRevision: async () => 5, onChange, environment: fake.env });
+    await fake.flush();
+    expect(onChange).toHaveBeenCalledTimes(1);
+    poller.viewArrived(4); // the server could only vouch for revision 4
+    await fake.advance(1500);
+    expect(onChange).toHaveBeenCalledTimes(2);
+    poller.viewArrived(5);
+    await fake.advance(1500);
+    expect(onChange).toHaveBeenCalledTimes(2);
+    poller.viewArrived(6); // newer than polled: nothing to catch up on
+    await fake.advance(1500);
+    expect(onChange).toHaveBeenCalledTimes(2);
+    poller.stop();
+  });
+
   it('backs off on failures and recovers', async () => {
     const fake = fakeEnvironment();
     let failing = true;
