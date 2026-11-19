@@ -15,6 +15,7 @@ import { GuestsPanel, MessagesPanel, QuizPanel, RevealPanel, VotingPanel } from 
 import { QuizEditor } from '@/features/admin/QuizEditor';
 import { KeepsakeCard, PreviewToolsCard, ShareCard } from '@/features/admin/SideCards';
 import { SecretCard } from '@/features/admin/SecretCard';
+import { RehearsalCard } from '@/features/admin/RehearsalCard';
 import { AdminSessionProvider, adminSessionStore } from '@/features/admin/adminSession';
 import { useLiveView } from '@/hooks/useLiveView';
 import { ApiError, api, isMockApi, type AdminSession } from '@/services/api';
@@ -83,6 +84,7 @@ function AdminDashboard({ session, onSignOut }: { session: AdminSession; onSignO
           <SecretCard view={view} onChanged={refresh} />
           <ShareCard view={view} />
           <KeepsakeCard />
+          <RehearsalCard view={view} onChanged={refresh} />
           <PreviewToolsCard onChanged={refresh} />
         </aside>
 

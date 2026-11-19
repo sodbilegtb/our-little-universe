@@ -7,6 +7,7 @@ import {
   issueDoctorLink,
   recordDoctorSelection,
   resetSecret,
+  startNewRun,
   upgradeState,
   castVote,
   createEventState,
@@ -425,6 +426,12 @@ export const mockEventApi: EventApi = {
       },
       [400, 700],
     ),
+
+  startNewRehearsal: (admin) =>
+    call('admin', () => {
+      requireAdmin(admin.token);
+      retire(write((draft) => startNewRun(draft)).retiredSelectionId);
+    }),
 
   verifyDoctorLink: (token) =>
     call(

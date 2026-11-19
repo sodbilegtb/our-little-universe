@@ -83,6 +83,7 @@ export function createHttpEventApi(baseUrl: string): EventApi {
     resendRevealCode: (admin) => request('POST', '/v1/admin/doctor/resend', { auth: adminAuth(admin) }),
     resetSecret: (admin) => request('POST', '/v1/admin/doctor/reset', { body: { confirm: 'RESET' }, auth: adminAuth(admin) }),
     simulateDoctor: (admin) => request('POST', '/v1/admin/doctor/simulate', { auth: adminAuth(admin) }),
+    startNewRehearsal: (admin) => request('POST', '/v1/admin/rehearsal/new', { body: { confirm: 'NEW' }, auth: adminAuth(admin) }),
 
     // The token goes in the body, never in a URL (URLs end up in access logs).
     verifyDoctorLink: (token) => request('POST', '/v1/doctor/session', { body: { token } }),

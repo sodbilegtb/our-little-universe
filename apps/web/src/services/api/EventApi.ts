@@ -67,6 +67,8 @@ export interface EventApi {
   resetSecret(admin: AdminSession): Promise<void>;
   /** TEST mode only: a random doctor answer, so a rehearsal can run end to end. */
   simulateDoctor(admin: AdminSession): Promise<SimulatedDoctorResult>;
+  /** TEST mode only: starts the evening over as a new rehearsal run. Nothing is erased. */
+  startNewRehearsal(admin: AdminSession): Promise<void>;
 
   /** Doctor actions. The selection travels one way only and is never read back. */
   verifyDoctorLink(token: string): Promise<DoctorSessionResult>;
