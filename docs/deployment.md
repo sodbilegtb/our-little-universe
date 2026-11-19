@@ -21,6 +21,12 @@ CloudWatch: logs (14 days), alarms → SNS email, monthly budget alert
   If you use profiles: `export AWS_PROFILE=olu` (Terraform and the scripts both respect it).
 - Node.js 22 and `zip` (for the web upload).
 - `export AWS_REGION=eu-central-1` (or the region you set in the tfvars).
+- **Enough Lambda concurrency.** Newer accounts are often limited to 10 concurrent Lambda executions; the standard is 1000. With 40 phones that limit is hit at busy moments and API Gateway answers some requests with HTTP 503 ("The Lambda function is being throttled"). Check and, if needed, request the increase early, as approval can take from minutes to a few days. It is free.
+  ```bash
+  aws lambda get-account-settings --query 'AccountLimit.ConcurrentExecutions'
+  aws service-quotas request-service-quota-increase --service-code lambda \
+    --quota-code L-B99A9384 --desired-value 1000 --region eu-central-1
+  ```
 
 ## 2. Bootstrap the state bucket (once per account)
 
@@ -175,6 +181,12 @@ The table has point-in-time recovery but no deletion protection in dev. Producti
 - **The web app loads but every request fails:** run the smoke test. A CORS failure means the app URL changed; `terraform apply` again. A 401 on host actions before sign-in is expected.
 - **"Host sign-in isn't configured":** run step 4, then wait up to 30 seconds.
 - **Phones show "Reconnecting…" during busy moments at a big party:** the API rate limit may be too low. The rehearsal prints the busiest request rate; raise `api_rate_limit` and apply.
-- **Lambda throttled in a new account:** new accounts can have a low concurrency quota (sometimes 10). Leave `reserved_concurrency = -1` and, if the alarm fires during a rehearsal, request a quota increase in Service Quotas.
+- **HTTP 503 "The Lambda function is being throttled" in the rehearsal or access logs:** the account's Lambda concurrency limit is too low (see Prerequisites). Leave `reserved_concurrency = -1` and request the quota increase.
+- **Finding the cause of failed requests:** the rehearsal lists each one with its request id. Search the access logs for server errors:
+  ```bash
+  START=$(( ($(date +%s) - 7200) * 1000 ))
+  aws logs filter-log-events --log-group-name /aws/apigateway/olu-dev-api --start-time $START \
+    --filter-pattern '{ $.status = "5*" }' --query 'events[].message' --output text
+  ```
 - **No alarm emails:** confirm the SNS subscription email.
 - **Amplify shows the old version:** check the job in the Amplify console; the deploy script exits non-zero if a deployment fails.
