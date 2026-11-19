@@ -24,3 +24,6 @@ _to_delete/
 **/.terraform-build/
 **/backend.hcl
 apps/web/web-deploy.zip
+
+# Lock files from `terraform test` in the modules (the environments keep theirs)
+infrastructure/terraform/modules/**/.terraform.lock.hcl
