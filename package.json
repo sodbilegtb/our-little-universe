@@ -26,6 +26,7 @@
     "aws:set-gmail-password": "npm run set-gmail-password -w @olu/api --",
     "aws:deploy-web": "node scripts/aws/deploy-web.mjs",
     "aws:smoke": "node scripts/aws/smoke-test.mjs",
+    "aws:preflight": "node scripts/aws/preflight.mjs",
     "rehearse": "node scripts/rehearse.mjs"
   }
 }

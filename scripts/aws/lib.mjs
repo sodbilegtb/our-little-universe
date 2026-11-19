@@ -49,3 +49,22 @@ export function terraformOutputs(env) {
     region: value('region'),
   };
 }
+
+/** Asks for a typed confirmation on the terminal; anything else stops the script. */
+export async function confirmTyped(question, expected) {
+  const { createInterface } = await import('node:readline/promises');
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const answer = (await rl.question(`${question} Type "${expected}" to continue: `)).trim();
+  rl.close();
+  if (answer !== expected) {
+    console.error('Stopped. Nothing was changed.');
+    process.exit(1);
+  }
+}
+
+/** A Terraform output that may be missing (older environments), or undefined. */
+const outputCache = new Map();
+export function optionalOutput(env, name) {
+  if (!outputCache.has(env)) outputCache.set(env, json('terraform', [`-chdir=infrastructure/terraform/environments/${env}`, 'output', '-json']));
+  return outputCache.get(env)[name]?.value;
+}

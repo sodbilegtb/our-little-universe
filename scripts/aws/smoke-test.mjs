@@ -5,10 +5,14 @@ import { parseEnv, terraformOutputs } from './lib.mjs';
  *   npm run aws:smoke -- dev
  *   ADMIN_PASSWORD=... npm run aws:smoke -- dev     (also checks host sign-in)
  *   SMOKE_WRITE=1 npm run aws:smoke -- dev          (also registers a test guest)
- * Read-only by default, so it is safe to run against prod.
+ * Read-only by default, so it is safe to run against prod (SMOKE_WRITE is refused there).
  */
 
 const env = parseEnv(process.argv);
+if (env === 'prod' && process.env.SMOKE_WRITE === '1') {
+  console.error('SMOKE_WRITE adds a guest named "Smoke test" to the event. Not on prod: guests would see it on the TV.');
+  process.exit(1);
+}
 const out = terraformOutputs(env);
 const api = out.apiEndpoint.replace(/\/$/, '');
 let failures = 0;

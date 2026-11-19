@@ -1,6 +1,6 @@
 import { readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { json, parseEnv, root, run, terraformOutputs } from './lib.mjs';
+import { confirmTyped, json, optionalOutput, parseEnv, root, run, terraformOutputs } from './lib.mjs';
 
 /*
  * Builds the web app against the deployed API and publishes it to Amplify:
@@ -11,6 +11,13 @@ import { json, parseEnv, root, run, terraformOutputs } from './lib.mjs';
 const env = parseEnv(process.argv);
 const out = terraformOutputs(env);
 const region = ['--region', out.region];
+
+if (env === 'prod') {
+  const mode = optionalOutput(env, 'reveal_mode');
+  const eventId = optionalOutput(env, 'event_id');
+  console.log(`\nProduction: ${out.appUrl}\n  reveal mode  ${mode}\n  event        ${eventId}`);
+  await confirmTyped('This replaces the web app guests and the TV use.', 'prod');
+}
 
 console.log(`\nBuilding the web app for ${env} (API ${out.apiEndpoint})…`);
 run('npm', ['run', 'build', '-w', '@olu/web'], {
