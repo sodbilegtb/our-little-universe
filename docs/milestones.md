@@ -172,7 +172,7 @@ The DynamoDB repository had not run against a real DynamoDB engine at the end of
 - **Doctor page:** checks the link read-only, then lets the doctor choose and confirm. A submission id per confirmation makes double clicks and retries harmless. Refreshing after sealing shows "Already sealed".
 - **Sealing:** the answer is encrypted with KMS at once. A random code (about 59 bits, no prefix) is encrypted with it and claimed as unique. The event records only an opaque selection id.
 - **Code email:** sent by a separate mailer Lambda via SES (subject `OFFICIAL BABY REVEAL CODE`, `[TEST]` in test mode). Failed sends are retried, and "Send the code again" always repeats the same code.
-- **Reveal code:** verified by hash bound to environment and event, matched to the current sealed answer, with 10 attempts per 15 minutes per event. Accepting it starts the reveal with a server-side `revealAt` (26 s).
+- **Reveal code:** verified by hash bound to environment and event, matched to the current sealed answer, with 10 attempts per 15 minutes per event. Accepting it starts the reveal with a server-side `revealAt` (30 s since Milestone 7).
 - **Result:** `GET /v1/reveal/result` is served by a separate, read-only reveal Lambda, only from `revealAt` on.
 - **Reset:** retires the answer, its code and the link (typed confirmation; impossible once the reveal began).
 - **Test and live:** set by the environment. dev and local are TEST; prod is LIVE unless explicitly set to TEST. "Simulate the doctor" exists in TEST only.
@@ -208,7 +208,7 @@ About 30 seconds on the TV, laid out around the server's `revealAt` (R), see `ap
 
 | From | Stage | On screen |
 |---|---|---|
-| code accepted | hush | "THE FINAL SECRET" fades, the room darkens, stars come out |
+| code accepted | hush | the code from the email decodes on screen (characters scramble through letters and stars, then lock in gold, left to right), glows, and dissolves into stars |
 | R-21 s | gather | the stars converge and a heart of light is drawn |
 | R-11 s | tension | the heart beats faster, then folds into one point |
 | R-5 s | countdown | 5, 4, 3, 2, 1 |
@@ -216,7 +216,7 @@ About 30 seconds on the TV, laid out around the server's `revealAt` (R), see `ap
 | R+1.2 s | burst | a flash of light, the colour, confetti, "IT'S A BOY!" or "IT'S A GIRL!" |
 | R+9 s | celebrate | the celebration settles |
 
-- **Secrecy:** the TV requests the result only once the reveal moment has come (server clock), and the burst waits for it. Before that no page, bundle or response holds it; the end-to-end test against the real API checks that the first request comes 26 s after the code. Pink and blue (soft dawn tones) appear only from the burst on. Phones keep showing "Look at the big screen!".
+- **Secrecy:** the TV requests the result only once the reveal moment has come (server clock), and the burst waits for it. Before that no page, bundle or response holds it; the end-to-end test against the real API checks that the first request comes 30 s after the code. Pink and blue (soft dawn tones) appear only from the burst on. Phones keep showing "Look at the big screen!".
 - **Refresh:** the stage is computed from the server clock, so a refreshed TV picks up at the right moment; one that returns long after the burst shows the celebration without replaying it.
 - **After the evening:** the thank-you screen shows the result too (the reveal service keeps answering in the finished phase, never before `revealAt`).
 - **Reduced motion:** no moving stars, no flash, no confetti; the same moments as calm fades.
