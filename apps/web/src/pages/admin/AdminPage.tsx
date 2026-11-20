@@ -79,7 +79,7 @@ function AdminDashboard({ session, onSignOut }: { session: AdminSession; onSignO
       <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
         <aside className="grid content-start gap-6 lg:sticky lg:top-6">
           <section className="rounded-[1.5rem] border border-ivory/[0.08] bg-night-deep/40 p-3">
-            <PhaseTimeline phase={view.phase} />
+            <PhaseTimeline phase={view.phase} skipped={view.quizEnabled ? [] : ['QUIZ']} />
           </section>
           <SecretCard view={view} onChanged={refresh} />
           <ShareCard view={view} />

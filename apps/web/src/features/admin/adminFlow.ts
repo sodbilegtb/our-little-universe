@@ -52,7 +52,8 @@ export function actionsFor(view: AdminView): AdminActions {
             },
             secondary: [],
           }
-        : {
+        : view.quizEnabled
+          ? {
             status: 'Voting is closed. The final guesses are on the TV.',
             primary: {
               label: 'Start the quiz',
@@ -61,6 +62,19 @@ export function actionsFor(view: AdminView): AdminActions {
                 title: 'Start Mom vs. Dad?',
                 body: 'The TV and every phone move to the quiz intro. You open each question yourself.',
                 confirmLabel: 'Start the quiz',
+              },
+            },
+            secondary: [],
+          }
+          : {
+            status: 'Voting is closed. The final guesses are on the TV. The quiz is off tonight.',
+            primary: {
+              label: 'Start messages for baby',
+              command: { type: 'START_MESSAGES' },
+              confirm: {
+                title: 'Start messages for baby?',
+                body: 'The quiz is off tonight, so every phone goes straight to the message form, and the TV starts the constellation.',
+                confirmLabel: 'Start messages',
               },
             },
             secondary: [],

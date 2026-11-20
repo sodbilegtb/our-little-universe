@@ -82,3 +82,25 @@ test('a new rehearsal brings everyone back to the lobby, with nothing erased', a
   await expect(phone.getByLabel("What's your name?")).toBeVisible(); // Mia joins again
   await expect(admin.getByText('No link yet')).toBeVisible();
 });
+
+test('without the quiz, voting leads straight to messages, and the quiz can come back until then', async ({ evening }) => {
+  const { admin, tv, phone } = evening;
+  await joinAs(phone, 'Mia');
+
+  await admin.getByRole('button', { name: 'Skip the quiz tonight' }).click();
+  await admin.getByRole('alertdialog').getByRole('button', { name: 'Skip the quiz' }).click();
+  await expect(admin.getByText('Skipped tonight')).toBeVisible(); // the quiz panel
+  // changed our mind, and back again: possible until the messages start
+  await admin.getByRole('button', { name: 'Bring the quiz back' }).click();
+  await expect(admin.getByRole('button', { name: 'Skip the quiz tonight' })).toBeVisible();
+  await admin.getByRole('button', { name: 'Skip the quiz tonight' }).click();
+  await admin.getByRole('alertdialog').getByRole('button', { name: 'Skip the quiz' }).click();
+
+  await hostAction(admin, 'Start voting', 'Start voting');
+  await hostAction(admin, 'Close voting', 'Close voting');
+  await expect(admin.getByRole('button', { name: 'Start the quiz', exact: true })).toHaveCount(0);
+  await hostAction(admin, 'Start messages for baby', 'Start messages');
+
+  await expect(tv.getByText('A Message for Our Little One')).toBeVisible();
+  await expect(phone.getByRole('heading', { name: 'A Message for Our Little One' })).toBeVisible();
+});

@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { ChevronDown, Lock, Save, Undo2 } from 'lucide-react';
+import { ChevronDown, Lock, Save, SkipForward, Undo2 } from 'lucide-react';
 import {
   QUIZ_TIME_LIMITS,
   quizConfigSchema,
@@ -10,6 +10,7 @@ import {
   type QuizQuestionConfig,
 } from '@olu/shared';
 import { Button } from '@/components/ui/Button';
+import { ConfirmDialog } from '@/components/ui/Dialog';
 import { Pill } from '@/components/ui/Pill';
 import { OPTION_LETTERS } from '@/features/quiz/ordinal';
 import { cn } from '@/lib/cn';
@@ -46,6 +47,7 @@ export function QuizEditor({ view, onChanged }: { view: AdminView; onChanged: ()
   const [openId, setOpenId] = useState<string | null>(null);
   const [showErrors, setShowErrors] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
+  const [confirmSkip, setConfirmSkip] = useState(false);
   const locked = !view.quizEditable;
 
   const dirty = useMemo(() => JSON.stringify(draft) !== JSON.stringify(saved), [draft, saved]);
@@ -79,6 +81,33 @@ export function QuizEditor({ view, onChanged }: { view: AdminView; onChanged: ()
       setJustSaved(true);
     }
   };
+
+  if (!view.quizEnabled) {
+    return (
+      <Panel title="Mom vs. Dad quiz" aside={<Pill tone="lavender">Skipped tonight</Pill>}>
+        <p className="max-w-[70ch] text-sm leading-relaxed text-mist">
+          After voting, the evening goes straight to messages for baby. Your questions are kept.
+        </p>
+        {error && (
+          <p role="alert" className="mt-3 text-sm text-danger">
+            {error}
+          </p>
+        )}
+        {!locked && (
+          <Button
+            className="mt-4"
+            variant="quiet"
+            size="sm"
+            align="start"
+            loading={busy === 'SET_QUIZ_ENABLED'}
+            onClick={() => void run({ type: 'SET_QUIZ_ENABLED', enabled: true })}
+          >
+            Bring the quiz back
+          </Button>
+        )}
+      </Panel>
+    );
+  }
 
   return (
     <Panel
@@ -145,6 +174,31 @@ export function QuizEditor({ view, onChanged }: { view: AdminView; onChanged: ()
           />
         ))}
       </ol>
+
+      {!locked && (
+        <div className="mt-5 flex justify-end">
+          <Button variant="quiet" size="sm" icon={<SkipForward className="h-4 w-4" aria-hidden />} onClick={() => setConfirmSkip(true)}>
+            Skip the quiz tonight
+          </Button>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={confirmSkip}
+        title="Skip the quiz tonight?"
+        confirmLabel="Skip the quiz"
+        busy={busy === 'SET_QUIZ_ENABLED'}
+        onCancel={() => setConfirmSkip(false)}
+        onConfirm={async () => {
+          await run({ type: 'SET_QUIZ_ENABLED', enabled: false });
+          setConfirmSkip(false);
+        }}
+      >
+        <p>
+          After voting, the evening goes straight to messages for baby. Your questions are kept, and you can bring the
+          quiz back until the messages start.
+        </p>
+      </ConfirmDialog>
     </Panel>
   );
 }
