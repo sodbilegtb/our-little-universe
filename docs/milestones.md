@@ -272,3 +272,9 @@ About 30 seconds on the TV, laid out around the server's `revealAt` (R), see `ap
 ### Verified
 - `node --test` for the archive: CSV round trip with quotes, line breaks, emoji and formula guards; a whole archive verifies, a changed or missing file is reported; the memory book escapes HTML and leaves out removed messages; the result appears only once revealed.
 - The export end to end against the local API after a rehearsal; backup and teardown check against stand-ins for the AWS CLI and Terraform (ready, missing export, missing backup, dev while prod exists); prod `terraform test` for `allow_destroy`.
+
+## After Milestone 9: changes for the evening
+
+- **The code decodes on the TV.** Once the host's code is accepted (and so spent), the TV view carries it and the TV decodes it: each character scrambles through letters and little stars and locks in gold, then the code dissolves into the stars of the heart. The build-up grows from 26 to 30 seconds for it. Phones never get the code.
+- **The quiz is optional.** "Skip the quiz tonight" (`SET_QUIZ_ENABLED`) turns it off before it starts; voting then leads straight to messages, the server refuses `START_QUIZ`, the step list shows the quiz as skipped, and the questions are kept. It can be turned back on until the messages start, and a new rehearsal keeps the choice. The rehearsal tool skips the quiz when it is off.
+

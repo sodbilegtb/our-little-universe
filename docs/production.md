@@ -95,6 +95,8 @@ If the email doesn't arrive: "Send the code again" on the host desk (always the 
 
 **The flow** (host desk, top to bottom): start voting, close voting, start the quiz, ten questions (open, close, reveal answer, next), finish the quiz, start messages (approve the ones for the TV), start the reveal, enter the code from the email, watch the TV (about 30 seconds), finish the event.
 
+**Without the quiz:** "Skip the quiz tonight" under the questions on the host desk, any time before the messages start. Voting then leads straight to "Start messages for baby"; the questions are kept, and "Bring the quiz back" undoes it until then.
+
 **If something goes wrong**
 
 | Problem | What to do |
