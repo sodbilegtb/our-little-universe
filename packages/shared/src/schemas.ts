@@ -108,6 +108,7 @@ export const adminCommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('SET_MESSAGE_HIDDEN'), messageId: z.string().min(1).max(80), hidden: z.boolean() }).strict(),
   z.object({ type: z.literal('SET_MESSAGE_REMOVED'), messageId: z.string().min(1).max(80), removed: z.boolean() }).strict(),
   z.object({ type: z.literal('UPDATE_QUIZ_QUESTIONS'), questions: quizConfigSchema }).strict(),
+  z.object({ type: z.literal('SET_QUIZ_ENABLED'), enabled: z.boolean() }).strict(),
 ]);
 
 export const adminSignInSchema = z.object({ password: z.string().min(1, 'Enter the host password.').max(200) });

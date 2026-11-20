@@ -66,6 +66,7 @@ export function applyAdminCommand(state: EventState, command: AdminCommand, now:
 
     case 'START_QUIZ':
       requirePhase(state, 'VOTING');
+      if (!state.settings.quizEnabled) fail('WRONG_PHASE', 'The quiz is turned off tonight.');
       state.voting.open = false;
       state.phase = 'QUIZ';
       state.quiz.stage = 'INTRO';
@@ -107,7 +108,12 @@ export function applyAdminCommand(state: EventState, command: AdminCommand, now:
       return;
 
     case 'START_MESSAGES':
-      requireStage(state, 'RESULTS');
+      if (state.settings.quizEnabled) requireStage(state, 'RESULTS');
+      else {
+        // Without the quiz, messages follow the voting directly.
+        requirePhase(state, 'VOTING');
+        state.voting.open = false;
+      }
       state.phase = 'MESSAGES';
       state.messages.open = true;
       return;
@@ -145,6 +151,11 @@ export function applyAdminCommand(state: EventState, command: AdminCommand, now:
       if (command.type === 'SET_MESSAGE_HIDDEN') message.hidden = command.hidden;
       return;
     }
+
+    case 'SET_QUIZ_ENABLED':
+      if (!isQuizEditable(state)) fail('LOCKED', 'The quiz can only be turned on or off before it starts.');
+      state.settings.quizEnabled = command.enabled;
+      return;
 
     case 'UPDATE_QUIZ_QUESTIONS': {
       if (!isQuizEditable(state)) fail('LOCKED', 'Questions are locked once the quiz has started.');

@@ -52,6 +52,8 @@ export interface MessageRecord {
 }
 
 export interface EventSettings {
+  /** Whether tonight has the Mom vs. Dad quiz. Off: voting leads straight to messages. */
+  quizEnabled: boolean;
   messagesPerGuest: number;
   /** Answers arriving this long after the deadline still count (network latency). */
   answerGraceMs: number;
@@ -132,13 +134,14 @@ export const INITIAL_REVEAL: RevealState = { status: 'LOCKED', startedAt: null, 
 /**
  * Fills in fields added after an event was first stored (events created before
  * Milestone 6 only had `doctor.status` and `reveal.status`, before Milestone 7
- * no `run`).
+ * no `run`, and settings without `quizEnabled`).
  */
-export function upgradeState<T extends Pick<EventState, 'doctor' | 'reveal'> & { run?: number }>(
+export function upgradeState<T extends Pick<EventState, 'doctor' | 'reveal'> & { run?: number; settings?: Partial<EventSettings> }>(
   state: T,
 ): T & { run: number } {
   return {
     ...state,
+    ...(state.settings ? { settings: { ...DEFAULT_SETTINGS, ...state.settings } } : {}),
     run: state.run ?? 0,
     doctor: { ...INITIAL_DOCTOR, ...state.doctor },
     reveal: { ...INITIAL_REVEAL, ...state.reveal },
@@ -146,6 +149,7 @@ export function upgradeState<T extends Pick<EventState, 'doctor' | 'reveal'> & {
 }
 
 export const DEFAULT_SETTINGS: EventSettings = {
+  quizEnabled: true,
   messagesPerGuest: MESSAGES_PER_GUEST,
   answerGraceMs: 1500,
 };

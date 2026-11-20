@@ -164,8 +164,10 @@ export interface AdminGuest {
 export interface AdminView extends BaseEventView {
   joinUrl: string;
   guests: AdminGuest[];
-  /** Questions can be edited until the quiz starts. */
+  /** Questions can be edited, and the quiz turned on or off, until it starts. */
   quizEditable: boolean;
+  /** Whether tonight has the quiz; off, voting leads straight to messages. */
+  quizEnabled: boolean;
   voting: { open: boolean; tally: VoteTally };
   quiz: QuizRoundView & { questions: QuizQuestionConfig[] };
   leaderboard: LeaderboardEntry[];

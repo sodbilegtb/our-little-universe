@@ -65,6 +65,32 @@ describe('phase transitions', () => {
   });
 });
 
+describe('an evening without the quiz', () => {
+  it('goes from voting straight to messages once the host turns the quiz off', () => {
+    const h = createHarness();
+    const questions = h.state.quiz.questions;
+    h.command({ type: 'SET_QUIZ_ENABLED', enabled: false });
+    h.commands('START_VOTING');
+    expect(codeOf(() => h.command({ type: 'START_QUIZ' }))).toBe('WRONG_PHASE');
+    h.commands('START_MESSAGES'); // closes the voting on the way
+    expect(h.state).toMatchObject({ phase: 'MESSAGES', voting: { open: false }, messages: { open: true } });
+    h.commands('CLOSE_MESSAGES', 'START_REVEAL', 'FINISH_EVENT');
+    expect(h.state.phase).toBe('FINISHED');
+    expect(h.state.quiz.questions).toEqual(questions); // the questions are kept
+    expect(toAdminView(h.state, h.clock.now, '', 'TEST')).toMatchObject({ quizEnabled: false, leaderboard: [] });
+  });
+
+  it('can be turned back on, but only until the quiz starts', () => {
+    const h = createHarness();
+    h.command({ type: 'SET_QUIZ_ENABLED', enabled: false });
+    h.commands('START_VOTING');
+    h.command({ type: 'SET_QUIZ_ENABLED', enabled: true });
+    expect(codeOf(() => h.command({ type: 'START_MESSAGES' }))).toBe('WRONG_PHASE'); // the quiz comes first again
+    h.commands('START_QUIZ');
+    expect(codeOf(() => h.command({ type: 'SET_QUIZ_ENABLED', enabled: false }))).toBe('LOCKED');
+  });
+});
+
 describe('guest registration', () => {
   it('allows duplicate display names with distinct identities', () => {
     const h = createHarness();

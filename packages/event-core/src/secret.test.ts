@@ -145,6 +145,13 @@ describe('reveal authorization', () => {
   });
 });
 
+describe('stored events without the quiz switch', () => {
+  it('load with the quiz on', () => {
+    const old = { doctor: {}, reveal: {}, settings: { messagesPerGuest: 3, answerGraceMs: 1500 } } as never;
+    expect(upgradeState(old)).toMatchObject({ settings: { quizEnabled: true, messagesPerGuest: 3 } });
+  });
+});
+
 describe('stored events from before milestone 6', () => {
   it('load with the new fields filled in', () => {
     const old = { doctor: { status: 'NOT_STARTED' }, reveal: { status: 'AWAITING_CODE' } } as never;

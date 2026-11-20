@@ -11,6 +11,7 @@ describe('a new rehearsal run', () => {
       type: 'UPDATE_QUIZ_QUESTIONS',
       questions: h.state.quiz.questions.map((q, i) => (i === 0 ? { ...q, text: 'Who sleeps in on Sundays?' } : q)),
     });
+    h.command({ type: 'SET_QUIZ_ENABLED', enabled: false });
     const mia = h.join('Mia');
     h.commands('START_VOTING');
     h.run((s) => castVote(s, mia, { choice: 'GIRL' }, h.clock.now));
@@ -34,5 +35,6 @@ describe('a new rehearsal run', () => {
     expect(h.state.doctor.generation).toBeGreaterThan(generation);
     expect(h.state.quiz.questions[0]?.text).toBe('Who sleeps in on Sundays?');
     expect(h.state.eventName).toBe('Test');
+    expect(h.state.settings.quizEnabled).toBe(false); // the host's choice carries over
   });
 });

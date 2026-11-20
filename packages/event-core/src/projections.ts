@@ -154,6 +154,7 @@ export function toAdminView(state: EventState, now: number, joinUrl: string, mod
       .sort((a, b) => b.joinedAt - a.joinedAt)
       .map((g) => ({ guestId: g.id, displayName: g.displayName, joinedAt: new Date(g.joinedAt).toISOString() })),
     quizEditable: isQuizEditable(state),
+    quizEnabled: state.settings.quizEnabled,
     voting: { open: state.voting.open, tally: voteTally(state) },
     quiz: { ...quizRound(state), questions: state.quiz.questions },
     leaderboard: computeLeaderboard(state),

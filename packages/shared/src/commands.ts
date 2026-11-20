@@ -21,7 +21,8 @@ export type AdminCommand =
   | { type: 'SET_MESSAGE_APPROVAL'; messageId: string; approved: boolean }
   | { type: 'SET_MESSAGE_HIDDEN'; messageId: string; hidden: boolean }
   | { type: 'SET_MESSAGE_REMOVED'; messageId: string; removed: boolean }
-  | { type: 'UPDATE_QUIZ_QUESTIONS'; questions: QuizQuestionConfig[] };
+  | { type: 'UPDATE_QUIZ_QUESTIONS'; questions: QuizQuestionConfig[] }
+  | { type: 'SET_QUIZ_ENABLED'; enabled: boolean };
 
 export type AdminCommandType = AdminCommand['type'];
 
