@@ -385,34 +385,38 @@ async function main() {
   loops.push(late.poll());
 
   console.log('\nQuiz');
-  await host('START_QUIZ');
-  const questions = (await adminView()).quiz.questions;
-  for (let i = 0; i < questions.length; i += 1) {
-    await host(i === 0 ? 'OPEN_QUESTION' : 'NEXT_QUESTION');
-    mark(`question ${i + 1}`, (v) => v.phase === 'QUIZ' && v.quiz.stage === 'QUESTION_OPEN' && v.quiz.questionNumber === i + 1);
-    await until(
-      () => (expected.answers.get(questions[i].id)?.size ?? 0) === guests.length,
-      (questions[i].timeLimitSec + 5) * 1000,
-      `answers to question ${i + 1}`,
-    );
+  if (!(await adminView()).quizEnabled) {
+    console.log('  – skipped: the quiz is off tonight (host desk)');
+  } else {
+    await host('START_QUIZ');
+    const questions = (await adminView()).quiz.questions;
+    for (let i = 0; i < questions.length; i += 1) {
+      await host(i === 0 ? 'OPEN_QUESTION' : 'NEXT_QUESTION');
+      mark(`question ${i + 1}`, (v) => v.phase === 'QUIZ' && v.quiz.stage === 'QUESTION_OPEN' && v.quiz.questionNumber === i + 1);
+      await until(
+        () => (expected.answers.get(questions[i].id)?.size ?? 0) === guests.length,
+        (questions[i].timeLimitSec + 5) * 1000,
+        `answers to question ${i + 1}`,
+      );
+      view = await adminView();
+      if (view.quiz.stage === 'QUESTION_OPEN') await host('CLOSE_QUESTION');
+      await host('REVEAL_ANSWER');
+    }
+    await host('FINISH_QUIZ');
     view = await adminView();
-    if (view.quiz.stage === 'QUESTION_OPEN') await host('CLOSE_QUESTION');
-    await host('REVEAL_ANSWER');
+    const scores = new Map(view.leaderboard.map((e) => [e.guestId, e.score]));
+    let mismatches = 0;
+    for (const g of guests) {
+      const want = questions.reduce(
+        (sum, q) => sum + (expected.answers.get(q.id)?.get(g.id) === q.correctOptionIndex ? 100 : 0),
+        0,
+      );
+      if ((scores.get(g.id) ?? 0) !== want) mismatches += 1;
+    }
+    check(mismatches === 0, `every score matches the answers sent (${guests.length} guests, 10 questions)`);
+    const ranked = view.leaderboard.every((e, i, all) => i === 0 || all[i - 1].score >= e.score);
+    check(ranked, 'leaderboard is ordered by score');
   }
-  await host('FINISH_QUIZ');
-  view = await adminView();
-  const scores = new Map(view.leaderboard.map((e) => [e.guestId, e.score]));
-  let mismatches = 0;
-  for (const g of guests) {
-    const want = questions.reduce(
-      (sum, q) => sum + (expected.answers.get(q.id)?.get(g.id) === q.correctOptionIndex ? 100 : 0),
-      0,
-    );
-    if ((scores.get(g.id) ?? 0) !== want) mismatches += 1;
-  }
-  check(mismatches === 0, `every score matches the answers sent (${guests.length} guests, 10 questions)`);
-  const ranked = view.leaderboard.every((e, i, all) => i === 0 || all[i - 1].score >= e.score);
-  check(ranked, 'leaderboard is ordered by score');
 
   console.log('\nMessages');
   await host('START_MESSAGES');
