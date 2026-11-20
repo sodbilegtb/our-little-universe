@@ -106,6 +106,8 @@ if (process.env.ADMIN_PASSWORD) {
     if (view.mode !== (mode ?? 'TEST')) fail(`The API runs in ${view.mode} mode, Terraform says ${mode}. Apply again`);
     else ok(`Host sign-in works, the API runs in ${view.mode} mode`);
     ok(`Phase ${view.phase}, ${view.guestCount} guests`);
+    if (view.quizEnabled === false) ok('Mom vs. Dad quiz: skipped tonight');
+    else if (view.quizEnabled === true) warn('Mom vs. Dad quiz: on. To skip it, "Skip the quiz tonight" on the host desk');
     const doctor = { NOT_STARTED: 'no doctor link yet', LINK_ISSUED: 'waiting for the doctor', SUBMITTED: 'answer sealed', CODE_SENT: 'answer sealed, code emailed' }[view.doctor.status];
     if (view.doctor.status === 'CODE_SENT') ok(`Doctor: ${doctor}`);
     else if (view.doctor.status === 'SUBMITTED' && view.doctor.email.status === 'FAILED') fail('Doctor: answer sealed, but the code email failed. "Send the code again" on the host desk');

@@ -72,6 +72,8 @@ npm run aws:preflight -- prod        # must say "LIVE mode"
 
 The host desk now shows "Live"; "Simulate the doctor" and "Start a new rehearsal" are gone, and the server refuses them. Don't switch back during the party.
 
+The new event id starts with the default settings: if you don't want the quiz, click "Skip the quiz tonight" again now. `ADMIN_PASSWORD=… npm run aws:preflight -- prod` shows whether it is on.
+
 ## 5. The doctor
 
 1. Create the doctor link on the host desk (`/admin`, "The secret") shortly before the appointment. It is valid for `doctor_link_hours` (48 by default) and shown only once, with a QR code. Send it to the doctor only.
