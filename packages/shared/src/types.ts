@@ -39,6 +39,8 @@ export interface RevealView {
   startedAt: string | null;
   /** ISO time from which the result may be shown (server clock). */
   revealAt: string | null;
+  /** The accepted (and so spent) code, decoded on the TV; null until accepted. */
+  code: string | null;
 }
 
 export type CodeEmailStatus = 'NONE' | 'PENDING' | 'SENT' | 'FAILED' | 'SKIPPED';

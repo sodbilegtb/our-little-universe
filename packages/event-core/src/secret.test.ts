@@ -77,7 +77,7 @@ describe('reset', () => {
     const h = createHarness();
     sealed(h);
     toRevealPhase(h);
-    h.run((s) => authorizeReveal(s, { selectionId: 'sel_1', delayMs: 26_000 }, h.clock.now));
+    h.run((s) => authorizeReveal(s, { selectionId: 'sel_1', delayMs: 26_000, code: 'R7KM-92PX-L4QT' }, h.clock.now));
     expect(codeOf(() => h.run((s) => resetSecret(s)))).toBe('LOCKED');
   });
 });
@@ -86,11 +86,11 @@ describe('reveal authorization', () => {
   it('needs the reveal phase and the current sealed answer', () => {
     const h = createHarness();
     sealed(h);
-    expect(codeOf(() => h.run((s) => authorizeReveal(s, { selectionId: 'sel_1', delayMs: 26_000 }, h.clock.now)))).toBe(
+    expect(codeOf(() => h.run((s) => authorizeReveal(s, { selectionId: 'sel_1', delayMs: 26_000, code: 'R7KM-92PX-L4QT' }, h.clock.now)))).toBe(
       'WRONG_PHASE',
     );
     toRevealPhase(h);
-    expect(codeOf(() => h.run((s) => authorizeReveal(s, { selectionId: 'sel_retired', delayMs: 26_000 }, h.clock.now)))).toBe(
+    expect(codeOf(() => h.run((s) => authorizeReveal(s, { selectionId: 'sel_retired', delayMs: 26_000, code: 'R7KM-92PX-L4QT' }, h.clock.now)))).toBe(
       'NOT_FOUND',
     );
     expect(h.state.reveal.status).toBe('AWAITING_CODE');
@@ -101,11 +101,11 @@ describe('reveal authorization', () => {
     sealed(h);
     toRevealPhase(h);
     const startedAt = h.clock.now;
-    expect(h.run((s) => authorizeReveal(s, { selectionId: 'sel_1', delayMs: 26_000 }, h.clock.now))).toBe('recorded');
-    expect(h.state.reveal).toEqual({ status: 'REVEALING', startedAt, revealAt: startedAt + 26_000 });
+    expect(h.run((s) => authorizeReveal(s, { selectionId: 'sel_1', delayMs: 26_000, code: 'R7KM-92PX-L4QT' }, h.clock.now))).toBe('recorded');
+    expect(h.state.reveal).toEqual({ status: 'REVEALING', startedAt, revealAt: startedAt + 26_000, code: 'R7KM-92PX-L4QT' });
     // entering the code again doesn't restart the countdown
     h.advance(5_000);
-    expect(h.run((s) => authorizeReveal(s, { selectionId: 'sel_1', delayMs: 26_000 }, h.clock.now))).toBe('already-recorded');
+    expect(h.run((s) => authorizeReveal(s, { selectionId: 'sel_1', delayMs: 26_000, code: 'R7KM-92PX-L4QT' }, h.clock.now))).toBe('already-recorded');
     expect(h.state.reveal.revealAt).toBe(startedAt + 26_000);
 
     h.advance(20_999);
@@ -119,7 +119,7 @@ describe('reveal authorization', () => {
     const h = createHarness();
     sealed(h);
     toRevealPhase(h);
-    h.run((s) => authorizeReveal(s, { selectionId: 'sel_1', delayMs: 26_000 }, h.clock.now));
+    h.run((s) => authorizeReveal(s, { selectionId: 'sel_1', delayMs: 26_000, code: 'R7KM-92PX-L4QT' }, h.clock.now));
     const views = [toTvView(h.state, h.clock.now, ''), toGuestView(h.state, null, h.clock.now), toAdminView(h.state, h.clock.now, '', 'TEST')];
     for (const view of views) {
       const text = JSON.stringify(view);
@@ -130,7 +130,18 @@ describe('reveal authorization', () => {
       status: 'REVEALING',
       startedAt: new Date(h.clock.now).toISOString(),
       revealAt: new Date(h.clock.now + 26_000).toISOString(),
+      code: 'R7KM-92PX-L4QT', // spent: the TV decodes it on screen
     });
+  });
+
+  it('shows the code on the TV only once it was accepted, never on phones', () => {
+    const h = createHarness();
+    sealed(h);
+    toRevealPhase(h);
+    expect(toTvView(h.state, h.clock.now, '').reveal.code).toBeNull();
+    h.run((s) => authorizeReveal(s, { selectionId: 'sel_1', delayMs: 26_000, code: 'R7KM-92PX-L4QT' }, h.clock.now));
+    expect(toTvView(h.state, h.clock.now, '').reveal.code).toBe('R7KM-92PX-L4QT');
+    expect(toGuestView(h.state, null, h.clock.now)).not.toHaveProperty('reveal');
   });
 });
 

@@ -39,7 +39,7 @@ const schema = z
     MAILER_FUNCTION_NAME: z.string().min(1).optional(),
     DOCTOR_LINK_HOURS: z.coerce.number().min(1).max(168).default(48),
     /** From the host entering the code to the moment the result may be shown. */
-    REVEAL_DELAY_SECONDS: z.coerce.number().min(5).max(120).default(26),
+    REVEAL_DELAY_SECONDS: z.coerce.number().min(5).max(120).default(30),
     /** Mailer only. */
     EMAIL_SENDER: z.email().optional(),
     EMAIL_RECIPIENTS: z.string().optional(),

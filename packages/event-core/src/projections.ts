@@ -133,7 +133,13 @@ export function toGuestView(state: EventState, guestId: string | null, now: numb
 }
 
 function revealView(state: EventState): RevealView {
-  return { status: state.reveal.status, startedAt: iso(state.reveal.startedAt), revealAt: iso(state.reveal.revealAt) };
+  const unlocked = state.reveal.status === 'REVEALING' || state.reveal.status === 'REVEALED';
+  return {
+    status: state.reveal.status,
+    startedAt: iso(state.reveal.startedAt),
+    revealAt: iso(state.reveal.revealAt),
+    code: unlocked ? state.reveal.code : null,
+  };
 }
 
 /**

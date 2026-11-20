@@ -155,7 +155,7 @@ variable "doctor_link_hours" {
 }
 
 variable "reveal_delay_seconds" {
-  description = "From the host's code being accepted to the moment the result may be shown."
+  description = "From the host's code being accepted to the moment the result may be shown (the TV decodes the code, then builds up to it)."
   type        = number
-  default     = 26
+  default     = 30
 }

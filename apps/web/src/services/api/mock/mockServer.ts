@@ -201,7 +201,7 @@ export function joinUrl(): string {
 /* ---------- the secret (preview stand-in for the secrets table, KMS and the mailer) ---------- */
 
 const DOCTOR_LINK_MS = 48 * 60 * 60 * 1000;
-const REVEAL_DELAY_MS = 26_000;
+const REVEAL_DELAY_MS = 30_000;
 const CODE_REJECTED = 'That code doesn’t unlock the reveal. Check it and try again.';
 
 const invalidLink = () =>
@@ -377,7 +377,7 @@ export const mockEventApi: EventApi = {
         const entry = Object.entries(secret.selections).find(([, s]) => s.code === parsed.data && s.status === 'ACTIVE');
         if (!entry) return { accepted: false, message: CODE_REJECTED };
         try {
-          write((draft, now) => authorizeReveal(draft, { selectionId: entry[0], delayMs: REVEAL_DELAY_MS }, now));
+          write((draft, now) => authorizeReveal(draft, { selectionId: entry[0], delayMs: REVEAL_DELAY_MS, code: parsed.data }, now));
         } catch (error) {
           if (error instanceof DomainError && error.code === 'NOT_FOUND') return { accepted: false, message: CODE_REJECTED };
           throw error;

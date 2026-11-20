@@ -111,6 +111,11 @@ export interface RevealState {
   startedAt: number | null;
   /** The server releases the result from this moment on, not before. */
   revealAt: number | null;
+  /**
+   * The host's code once it was accepted, for the TV to decode on screen. It is
+   * spent at that point (one reveal per answer) and says nothing about the result.
+   */
+  code: string | null;
 }
 
 export const INITIAL_DOCTOR: DoctorState = {
@@ -122,7 +127,7 @@ export const INITIAL_DOCTOR: DoctorState = {
   submittedAt: null,
 };
 
-export const INITIAL_REVEAL: RevealState = { status: 'LOCKED', startedAt: null, revealAt: null };
+export const INITIAL_REVEAL: RevealState = { status: 'LOCKED', startedAt: null, revealAt: null, code: null };
 
 /**
  * Fills in fields added after an event was first stored (events created before

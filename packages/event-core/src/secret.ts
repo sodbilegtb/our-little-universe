@@ -79,7 +79,7 @@ export function resetSecret(state: EventState): { retiredSelectionId: string | n
  */
 export function authorizeReveal(
   state: EventState,
-  input: { selectionId: string; delayMs: number },
+  input: { selectionId: string; delayMs: number; code: string },
   now: number,
 ): Outcome {
   if (state.phase !== 'REVEAL') fail('WRONG_PHASE', 'Start the reveal phase first.');
@@ -88,6 +88,6 @@ export function authorizeReveal(
   }
   if (state.reveal.status === 'REVEALING' || state.reveal.status === 'REVEALED') return 'already-recorded';
   if (state.reveal.status !== 'AWAITING_CODE') fail('WRONG_PHASE', 'Start the reveal phase first.');
-  state.reveal = { status: 'REVEALING', startedAt: now, revealAt: now + input.delayMs };
+  state.reveal = { status: 'REVEALING', startedAt: now, revealAt: now + input.delayMs, code: input.code };
   return 'recorded';
 }

@@ -550,7 +550,7 @@ export class EventService {
       return { accepted: false, message: CODE_REJECTED };
     }
     try {
-      await this.mutate((draft, now) => authorizeReveal(draft, { selectionId: found.selectionId, delayMs: this.config.revealDelayMs }, now));
+      await this.mutate((draft, now) => authorizeReveal(draft, { selectionId: found.selectionId, delayMs: this.config.revealDelayMs, code: normalized }, now));
     } catch (error) {
       if (error instanceof DomainError && error.code === 'NOT_FOUND') {
         this.logger.warn('reveal code rejected');

@@ -296,14 +296,15 @@ describe.each(backends)('the secret on $name', ({ create }) => {
     const accepted = await w.service.submitRevealCode(code);
     expect(accepted.accepted).toBe(true);
     const revealAt = Date.parse(accepted.revealAt!);
-    expect(revealAt - w.clock.now).toBe(26_000);
+    expect(revealAt - w.clock.now).toBe(30_000);
     expect((await w.service.tvView()).reveal).toEqual({
       status: 'REVEALING',
-      startedAt: new Date(revealAt - 26_000).toISOString(),
+      startedAt: new Date(revealAt - 30_000).toISOString(),
       revealAt: accepted.revealAt,
+      code,
     });
     expect(await w.reveal()).toBeNull(); // countdown running
-    w.clock.tick(25_999);
+    w.clock.tick(29_999);
     expect(await w.reveal()).toBeNull();
     w.clock.tick(1);
     expect(await w.reveal()).toEqual({ result: 'GIRL', revealAt: accepted.revealAt });
@@ -339,7 +340,7 @@ describe.each(backends)('the secret on $name', ({ create }) => {
       seen.push(await w.service.submitRevealCode('2222-2222-2222'));
       seen.push(await w.service.submitRevealCode(codeFromMail(w)));
       await look('revealing');
-      w.clock.tick(26_000);
+      w.clock.tick(30_000);
       await look('revealed'); // the views themselves still carry no result
       seen.push(w.logs);
       const result = await w.reveal();
