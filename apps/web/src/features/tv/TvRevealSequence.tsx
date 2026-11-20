@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion, type TargetAndTransition, type Transition } from 'motion/react';
 import type { RevealView } from '@olu/shared';
 import { Confetti } from '@/components/celebration/Confetti';
+import { CodeDecode } from './CodeDecode';
 import { ease } from '@/lib/motion';
 import { mulberry32 } from '@/lib/random';
 import { emitTvCue } from '@/lib/tvCues';
@@ -99,10 +100,11 @@ const CUE: Record<RevealStage, Parameters<typeof emitTvCue>[0]> = {
 export function TvRevealSequence({ reveal }: { reveal: RevealView }) {
   const revealAt = Date.parse(reveal.revealAt ?? '');
   if (Number.isNaN(revealAt)) return null;
-  return <Sequence revealAt={revealAt} />;
+  const startedAt = Date.parse(reveal.startedAt ?? '');
+  return <Sequence revealAt={revealAt} startedAt={Number.isNaN(startedAt) ? revealAt - 30_000 : startedAt} code={reveal.code} />;
 }
 
-function Sequence({ revealAt }: { revealAt: number }) {
+function Sequence({ revealAt, startedAt, code }: { revealAt: number; startedAt: number; code: string | null }) {
   const result = useRevealResult(revealAt);
   const { stage, digit } = useRevealStage(revealAt, result !== null);
   const reduce = useReducedMotion() ?? false;
@@ -123,7 +125,10 @@ function Sequence({ revealAt }: { revealAt: number }) {
       <Core stage={stage} left={left} palette={palette} />
 
       <AnimatePresence>
-        {stage === 'hush' && (
+        {stage === 'hush' && code && (
+          <CodeDecode key="decode" code={code} startedAt={startedAt} hushEndsAt={revealAt + STAGE_STARTS.gather} reduce={reduce} />
+        )}
+        {stage === 'hush' && !code && (
           <motion.div
             key="secret"
             className="absolute inset-0 flex flex-col items-center justify-center text-center"
@@ -199,9 +204,9 @@ function Motes({ stage, left }: { stage: RevealStage; left: number }) {
         let transition: Transition;
         switch (stage) {
           case 'hush':
-            // The stars come out one by one and drift a little closer.
+            // While the code decodes the sky stays quiet; the stars come out as it dissolves.
             animate = { x: m.home.x * 0.85, y: m.home.y * 0.85, opacity: 0.85, scale: 1 };
-            transition = { duration: Math.max(2, left), delay: m.delay * Math.min(2.5, left * 0.5), ease: ease.drift };
+            transition = { duration: 2.5, delay: Math.max(0, left - 3.5) + m.delay * 1.5, ease: ease.drift };
             break;
           case 'gather':
             animate = { x: m.heart.x, y: m.heart.y, opacity: 1, scale: 1.1 };

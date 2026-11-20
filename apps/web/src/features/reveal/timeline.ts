@@ -3,7 +3,7 @@
  * stage is defined by its distance to R, so any TV, including one refreshed
  * mid-sequence, shows the same moment as long as its clock is synced.
  *
- *   hush       from the host's code until R-21s   the room goes dark, motes stir
+ *   hush       from the host's code until R-21s   the code decodes on screen, then dissolves into stars
  *   gather     R-21s .. R-11s                     stars converge, a heart of light forms
  *   tension    R-11s .. R-5s                      the heart beats faster, then folds into one point
  *   countdown  R-5s  .. R                         5, 4, 3, 2, 1

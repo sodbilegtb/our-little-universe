@@ -29,10 +29,11 @@ test('the TV plays the reveal on the server clock, asks for the result only at t
   await expect(admin.getByText('The code was accepted. The reveal is on the TV now.')).toBeVisible();
   const unlockedAt = Date.now();
 
-  // The sequence starts and builds up, with no result anywhere yet.
+  // The sequence starts by decoding the (now spent) code, and builds up with no result anywhere yet.
   const sequence = tv.getByTestId('reveal-sequence');
   await expect(sequence).toHaveAttribute('data-stage', 'hush');
-  await expect(sequence).toHaveAttribute('data-stage', 'gather', { timeout: 10_000 });
+  await expect(tv.getByTestId('reveal-code')).toHaveAttribute('aria-label', `Code ${code}`);
+  await expect(sequence).toHaveAttribute('data-stage', 'gather', { timeout: 15_000 });
 
   // A refresh in the middle picks up where the sequence is, not from the start.
   await tv.reload();
@@ -46,16 +47,17 @@ test('the TV plays the reveal on the server clock, asks for the result only at t
   await expect(result).toBeVisible({ timeout: 15_000 });
   await expect(result.getByRole('heading')).toHaveText(/^IT’S A (BOY|GIRL)!$/);
   if (testInfo.project.name === 'local-api') {
-    // Against the real API: the first request came at the reveal moment (26 s after the code), not before.
+    // Against the real API: the first request came at the reveal moment (30 s after the code), not before.
     // (The mock answers in the browser, without network requests.)
     expect(resultRequests.length).toBeGreaterThan(0);
-    expect(resultRequests[0]! - unlockedAt).toBeGreaterThan(25_000);
+    expect(resultRequests[0]! - unlockedAt).toBeGreaterThan(29_000);
   }
   await tv.screenshot({ path: testInfo.outputPath('reveal-result.png') });
 
   // Phones never show the result: they point at the TV.
   await expect(phone.getByText('Look at the big screen!')).toBeVisible();
   await expect(phone.getByText(/IT’S A|It’s a (boy|girl)/)).toHaveCount(0);
+  await expect(phone.getByText(code)).toHaveCount(0); // the code is shown on the TV only
 
   // A TV that comes back much later goes straight to the celebration.
   await tv.reload();
