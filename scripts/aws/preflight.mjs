@@ -99,7 +99,11 @@ if (process.env.ADMIN_PASSWORD) {
     body: JSON.stringify({ password: process.env.ADMIN_PASSWORD }),
   });
   if (session.status !== 201) {
-    fail(`Host sign-in failed (HTTP ${session.status})`);
+    fail(
+      session.status === 401
+        ? `Host sign-in failed: ADMIN_PASSWORD isn't the ${env} password (dev and prod have their own). Set it again, or unset it to skip this part`
+        : `Host sign-in failed (HTTP ${session.status})`,
+    );
   } else {
     const { token } = await session.json();
     const view = await fetch(`${api}/v1/views/admin`, { headers: { authorization: `Bearer ${token}` } }).then((r) => r.json());
